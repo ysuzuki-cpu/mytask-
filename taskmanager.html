@@ -51,7 +51,7 @@
     .accordion-header:hover{filter:brightness(.95)}
     .accordion-body{max-height:0;overflow:hidden;transition:max-height .3s ease}
     .accordion-body.open{max-height:9999px}
-    .calendar-day{min-height:70px;padding:4px;display:flex;flex-direction:column;align-items:center;border-radius:.5rem;cursor:pointer;transition:all .15s}
+    .calendar-day{min-height:70px;padding:4px;display:flex;flex-direction:column;align-items:center;border-radius:.5najbolj;cursor:pointer;transition:all .15s}
     .calendar-day:hover{background:#f8fafc}
     .calendar-day.selected{background:#f8fafc;box-shadow:inset 0 0 0 2px #0f172a}
     .calendar-day.today{background:#eff6ff}
@@ -191,41 +191,41 @@
   <div id="child-modal" class="hidden"></div>
 
 <script>
-const API_URL='https://script.google.com/macros/s/AKfycbynJMq_uSA8B-InscpS2GO_FVM7353ng2SGu6xHI_elo0hiF6xjd9f069aoNx99umkp/exec';
-const statusMap={todo:{label:'未対応',cls:'status-todo',next:'doing'},doing:{label:'対応中',cls:'status-doing',next:'reply'},reply:{label:'返信待ち',cls:'status-reply',next:'waiting'},waiting:{label:'保留',cls:'status-waiting',next:'todo'}};
+var API_URL='https://script.google.com/macros/s/AKfycbynJMq_uSA8B-InscpS2GO_FVM7353ng2SGu6xHI_elo0hiF6xjd9f069aoNx99umkp/exec';
+var statusMap={todo:{label:'未対応',cls:'status-todo',next:'doing'},doing:{label:'対応中',cls:'status-doing',next:'reply'},reply:{label:'返信待ち',cls:'status-reply',next:'waiting'},waiting:{label:'保留',cls:'status-waiting',next:'todo'}};
 
-const defaultColors=[
+var defaultColors=[
   {bg:'#e8edf2',text:'#334155'},{bg:'#dbeafe',text:'#1e40af'},{bg:'#ede9fe',text:'#5b21b6'},
   {bg:'#fce7f3',text:'#9d174d'},{bg:'#fef3c7',text:'#92400e'},{bg:'#d1fae5',text:'#065f46'},
   {bg:'#fee2e2',text:'#991b1b'},{bg:'#cffafe',text:'#155e75'},{bg:'#e0e7ff',text:'#3730a3'},
   {bg:'#ecfccb',text:'#3f6212'}
 ];
 
-const holidays={
+var holidays={
   '2025-01-01':'元日','2025-01-13':'成人の日','2025-02-11':'建国記念の日','2025-02-23':'天皇誕生日','2025-02-24':'振替休日','2025-03-20':'春分の日','2025-04-29':'昭和の日','2025-05-03':'憲法記念日','2025-05-04':'みどりの日','2025-05-05':'こどもの日','2025-05-06':'振替休日','2025-07-21':'海の日','2025-08-11':'山の日','2025-09-15':'敬老の日','2025-09-23':'秋分の日','2025-10-13':'スポーツの日','2025-11-03':'文化の日','2025-11-23':'勤労感謝の日','2025-11-24':'振替休日',
   '2026-01-01':'元日','2026-01-12':'成人の日','2026-02-11':'建国記念の日','2026-02-23':'天皇誕生日','2026-03-20':'春分の日','2026-04-29':'昭和の日','2026-05-03':'憲法記念日','2026-05-04':'みどりの日','2026-05-05':'こどもの日','2026-05-06':'振替休日','2026-07-20':'海の日','2026-08-11':'山の日','2026-09-21':'敬老の日','2026-09-22':'国民の休日','2026-09-23':'秋分の日','2026-10-12':'スポーツの日','2026-11-03':'文化の日','2026-11-23':'勤労感謝の日',
   '2027-01-01':'元日','2027-01-11':'成人の日','2027-02-11':'建国記念の日','2027-02-23':'天皇誕生日','2027-03-21':'春分の日','2027-03-22':'振替休日','2027-04-29':'昭和の日','2027-05-03':'憲法記念日','2027-05-04':'みどりの日','2027-05-05':'こどもの日','2027-07-19':'海の日','2027-08-11':'山の日','2027-09-20':'敬老の日','2027-09-23':'秋分の日','2027-10-11':'スポーツの日','2027-11-03':'文化の日','2027-11-23':'勤労感謝の日'
 };
 
-let tasks=[];
-let password='';
-let selectedDate=todayStr();
-let currentView='list';
-let calendarMonth=new Date().getMonth();
-let calendarYear=new Date().getFullYear();
-let modalTab='task';
-let pendingDeleteId=null;
-let isSaving=false;
-let allAccordionsOpen=false;
-let clientOrder=[];
-let clientColorMap={};
+var tasks=[];
+var password='';
+var selectedDate=todayStr();
+var currentView='list';
+var calendarMonth=new Date().getMonth();
+var calendarYear=new Date().getFullYear();
+var modalTab='task';
+var pendingDeleteId=null;
+var isSaving=false;
+var allAccordionsOpen=false;
+var clientOrder=[];
+var clientColorMap={};
 
 function todayStr(){return new Date().toISOString().split('T')[0]}
-function tomorrowStr(){const d=new Date();d.setDate(d.getDate()+1);return d.toISOString().split('T')[0]}
-function hashStr(s){let h=0;for(let i=0;i<s.length;i++)h=s.charCodeAt(i)+((h<<5)-h);return Math.abs(h)}
+function tomorrowStr(){var d=new Date();d.setDate(d.getDate()+1);return d.toISOString().split('T')[0]}
+function hashStr(s){var h=0;for(var i=0;i<s.length;i++)h=s.charCodeAt(i)+((h<<5)-h);return Math.abs(h)}
 function getClientColor(name){if(clientColorMap[name])return clientColorMap[name];return defaultColors[hashStr(name)%defaultColors.length]}
 
-function showToast(msg,type){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+(type==='error'?'toast-error':'toast-success');setTimeout(()=>t.className='toast',2000)}
+function showToast(msg,type){var t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+(type==='error'?'toast-error':'toast-success');setTimeout(function(){t.className='toast'},2000)}
 function showError(msg){document.getElementById('error-msg').textContent=msg;document.getElementById('error-bar').classList.remove('hidden')}
 function hideError(){document.getElementById('error-bar').classList.add('hidden')}
 function retryFetch(){hideError();fetchTasks()}
@@ -239,10 +239,10 @@ function doLogin(){
 }
 
 function fetchTasks(){
-  const cached=localStorage.getItem('taskCache');
-  if(cached){try{const d=JSON.parse(cached);tasks=d.tasks||[];clientOrder=d.clientOrder?d.clientOrder.split(',').filter(Boolean):[];try{clientColorMap=d.clientColors?JSON.parse(d.clientColors):{}}catch(e){clientColorMap={}}renderAll()}catch(e){}}
-  const url=API_URL+'?action=getAll&password='+encodeURIComponent(password);
-  fetch(url).then(r=>r.json()).then(data=>{
+  var cached=localStorage.getItem('taskCache');
+  if(cached){try{var d=JSON.parse(cached);tasks=d.tasks||[];clientOrder=d.clientOrder?d.clientOrder.split(',').filter(Boolean):[];try{clientColorMap=d.clientColors?JSON.parse(d.clientColors):{}}catch(e){clientColorMap={}}renderAll()}catch(e){}}
+  var url=API_URL+'?action=getAll&password='+encodeURIComponent(password);
+  fetch(url).then(function(r){return r.json()}).then(function(data){
     if(data.error){document.getElementById('loading').classList.add('hidden');document.getElementById('login-screen').style.display='';document.getElementById('login-error').classList.remove('hidden');return}
     tasks=data.tasks||[];
     clientOrder=data.clientOrder?data.clientOrder.split(',').filter(Boolean):[];
@@ -252,7 +252,7 @@ function fetchTasks(){
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     renderAll();
-  }).catch(e=>{
+  }).catch(function(e){
     document.getElementById('loading').classList.add('hidden');
     if(tasks.length>0){document.getElementById('app').classList.remove('hidden');document.getElementById('offline-badge').classList.remove('hidden');showError('サーバーに接続できません')}
     else{document.getElementById('login-screen').style.display='';showToast('接続エラー','error')}
@@ -260,16 +260,26 @@ function fetchTasks(){
 }
 
 function apiCall(params){
-  isSaving=true;document.getElementById('submit-btn')&&(document.getElementById('submit-btn').disabled=true);
-  const url=API_URL+'?password='+encodeURIComponent(password)+'&'+new URLSearchParams(params).toString();
-  return fetch(url).then(r=>r.json()).then(d=>{isSaving=false;document.getElementById('submit-btn')&&(document.getElementById('submit-btn').disabled=false);if(d.error)throw new Error(d.error);showToast('保存しました');fetchTasks();return d}).catch(e=>{isSaving=false;document.getElementById('submit-btn')&&(document.getElementById('submit-btn').disabled=false);showToast('保存に失敗しました','error');throw e});
+  isSaving=true;
+  var btn=document.getElementById('submit-btn');
+  if(btn)btn.disabled=true;
+  var url=API_URL+'?password='+encodeURIComponent(password)+'&'+new URLSearchParams(params).toString();
+  return fetch(url).then(function(r){return r.json()}).then(function(d){
+    isSaving=false;if(btn)btn.disabled=false;
+    if(d.error)throw new Error(d.error);
+    showToast('保存しました');fetchTasks();return d;
+  }).catch(function(e){
+    isSaving=false;if(btn)btn.disabled=false;
+    showToast('保存に失敗しました','error');throw e;
+  });
 }
 
 function getOrderedClients(){
-  const allClients=[...new Set(tasks.map(t=>t.clientName).filter(Boolean))];
-  const ordered=[];
-  clientOrder.forEach(c=>{if(allClients.includes(c))ordered.push(c)});
-  allClients.forEach(c=>{if(!ordered.includes(c))ordered.push(c)});
+  var allClients=[];
+  tasks.forEach(function(t){if(t.clientName&&allClients.indexOf(t.clientName)===-1)allClients.push(t.clientName)});
+  var ordered=[];
+  clientOrder.forEach(function(c){if(allClients.indexOf(c)!==-1)ordered.push(c)});
+  allClients.forEach(function(c){if(ordered.indexOf(c)===-1)ordered.push(c)});
   return ordered;
 }
 
@@ -284,72 +294,84 @@ function renderAll(){
 }
 
 function createTaskCard(t){
-  const s=statusMap[t.status]||statusMap.todo;
-  const isCompleted=t.completed;
-  const div=document.createElement('div');
+  var s=statusMap[t.status]||statusMap.todo;
+  var isCompleted=t.completed;
+  var div=document.createElement('div');
   div.className='task-panel'+(isCompleted?' task-completed':'');
-  const titleText=t.title||'（タスクなし）';
-  div.innerHTML=`
-    <div class="flex items-start gap-3">
-      <input type="checkbox" class="custom-checkbox mt-0.5" ${isCompleted?'checked':''} onchange="toggleTask('${t.id}')">
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2 flex-wrap mb-1">
-          <span class="task-title-text text-sm font-medium text-slate-800" style="word-break:break-word">${titleText}</span>
-        </div>
-        <div class="flex items-center gap-2 flex-wrap">
-          <span class="status-tag ${s.cls}" onclick="cycleStatus('${t.id}')">${s.label}</span>
-          ${t.date?'<span class="date-badge">'+t.date+'</span>':''}
-        </div>
-      </div>
-      <button onclick="openEditModal('${t.id}')" class="text-slate-300 hover:text-slate-500 shrink-0 mt-0.5"><i data-lucide="pencil" class="w-4 h-4"></i></button>
-    </div>`;
+  var titleText=t.title||'（タスクなし）';
+  var uid='t'+hashStr(t.id+Math.random());
+
+  div.innerHTML='<div class="flex items-start gap-3">'
+    +'<input type="checkbox" class="custom-checkbox mt-0.5" id="'+uid+'" '+(isCompleted?'checked':'')+'>'
+    +'<div class="flex-1 min-w-0">'
+    +'<div class="flex items-center gap-2 flex-wrap mb-1">'
+    +'<span class="task-title-text text-sm font-medium text-slate-800" style="word-break:break-word">'+titleText+'</span>'
+    +'</div>'
+    +'<div class="flex items-center gap-2 flex-wrap">'
+    +'<span class="status-tag '+s.cls+'" data-role="status">'+s.label+'</span>'
+    +(t.date?'<span class="date-badge">'+t.date+'</span>':'')
+    +'</div>'
+    +'</div>'
+    +'<button class="edit-btn text-slate-300 hover:text-slate-500 shrink-0 mt-0.5"><i data-lucide="pencil" class="w-4 h-4"></i></button>'
+    +'</div>';
+
+  var taskId=t.id;
+  div.querySelector('#'+uid).addEventListener('change',function(){toggleTask(taskId)});
+  div.querySelector('[data-role="status"]').addEventListener('click',function(){cycleStatus(taskId)});
+  div.querySelector('.edit-btn').addEventListener('click',function(e){e.stopPropagation();openEditModal(taskId)});
+
   return div;
 }
 
 function renderSummary(containerId){
-  const c=document.getElementById(containerId);if(!c)return;c.innerHTML='';
-  const today=todayStr(),tomorrow=tomorrowStr();
-  const upcoming=tasks.filter(t=>t.date===today||t.date===tomorrow).sort((a,b)=>a.date.localeCompare(b.date));
+  var c=document.getElementById(containerId);if(!c)return;c.innerHTML='';
+  var today=todayStr(),tomorrow=tomorrowStr();
+  var upcoming=tasks.filter(function(t){return t.date===today||t.date===tomorrow}).sort(function(a,b){return a.date.localeCompare(b.date)});
   if(upcoming.length===0){c.innerHTML='<p class="text-sm text-slate-400 py-4">直近の予定はありません</p>';return}
-  upcoming.forEach(t=>{
-    const label=t.date===today?'今日':'明日';
-    const card=createTaskCard(t);
-    const badge=document.createElement('span');badge.className='text-[10px] font-bold px-2 py-0.5 rounded '+(t.date===today?'bg-amber-100 text-amber-700':'bg-blue-50 text-blue-600');badge.textContent=label+' · '+(t.clientName||'');
-    card.querySelector('.flex-1').prepend(badge);
+  upcoming.forEach(function(t){
+    var label=t.date===today?'今日':'明日';
+    var card=createTaskCard(t);
+    var badge=document.createElement('span');
+    badge.className='text-[10px] font-bold px-2 py-0.5 rounded mb-1 inline-block '+(t.date===today?'bg-amber-100 text-amber-700':'bg-blue-50 text-blue-600');
+    badge.textContent=label+' · '+(t.clientName||'');
+    card.querySelector('.flex-1').insertBefore(badge,card.querySelector('.flex-1').firstChild);
     c.appendChild(card);
   });
 }
 
 function renderProjectList(){
-  const c=document.getElementById('project-container');c.innerHTML='';
-  const clients=getOrderedClients();
-  clients.forEach(name=>{
-    const color=getClientColor(name);
-    const clientTasks=tasks.filter(t=>t.clientName===name);
-    const parentTasks=clientTasks.filter(t=>!t.parentId);
-    const wrapper=document.createElement('div');
-    const header=document.createElement('div');
+  var c=document.getElementById('project-container');c.innerHTML='';
+  var clients=getOrderedClients();
+  clients.forEach(function(name){
+    var color=getClientColor(name);
+    var clientTasks=tasks.filter(function(t){return t.clientName===name});
+    var parentTasks=clientTasks.filter(function(t){return !t.parentId});
+    var wrapper=document.createElement('div');
+    var header=document.createElement('div');
     header.className='accordion-header';
     header.style.backgroundColor=color.bg;header.style.color=color.text;
-    header.innerHTML=`<div class="flex items-center gap-2"><span class="font-bold text-sm">${name}</span><span class="text-xs opacity-60">${clientTasks.length}件</span></div><i data-lucide="chevron-down" class="w-4 h-4 transition-transform"></i>`;
-    const body=document.createElement('div');body.className='accordion-body'+(allAccordionsOpen?' open':'');body.style.paddingTop=allAccordionsOpen?'0.5rem':'0';
-    header.onclick=()=>{
-      const isOpen=body.classList.toggle('open');
+    header.innerHTML='<div class="flex items-center gap-2"><span class="font-bold text-sm">'+name+'</span><span class="text-xs opacity-60">'+clientTasks.length+'件</span></div><i data-lucide="chevron-down" class="w-4 h-4 transition-transform"></i>';
+    var body=document.createElement('div');
+    body.className='accordion-body'+(allAccordionsOpen?' open':'');
+    if(allAccordionsOpen)body.style.paddingTop='0.5rem';
+
+    header.addEventListener('click',function(){
+      var isOpen=body.classList.toggle('open');
       body.style.paddingTop=isOpen?'0.5rem':'0';
-      header.querySelector('i').style.transform=isOpen?'rotate(180deg)':'';
-    };
-    if(allAccordionsOpen)header.querySelector('i').style.transform='rotate(180deg)';
+      var icon=header.querySelector('i');if(icon)icon.style.transform=isOpen?'rotate(180deg)':'';
+    });
+    if(allAccordionsOpen){var icon=header.querySelector('i');if(icon)icon.style.transform='rotate(180deg)'}
 
     if(parentTasks.length===0&&clientTasks.length===0){
-      const p=document.createElement('p');p.className='text-sm text-slate-400 py-3 px-1';p.textContent='タスクなし';body.appendChild(p);
+      var p=document.createElement('p');p.className='text-sm text-slate-400 py-3 px-1';p.textContent='タスクなし';body.appendChild(p);
     } else {
-      parentTasks.forEach(t=>{
-        if(t.title){body.appendChild(createTaskCard(t))}
-        const children=clientTasks.filter(ct=>ct.parentId===t.id);
-        children.forEach(ct=>{const card=createTaskCard(ct);card.style.marginLeft='1.5rem';card.style.marginTop='0.25rem';body.appendChild(card)});
+      parentTasks.forEach(function(t){
+        if(t.title)body.appendChild(createTaskCard(t));
+        var children=clientTasks.filter(function(ct){return ct.parentId===t.id});
+        children.forEach(function(ct){var card=createTaskCard(ct);card.style.marginLeft='1.5rem';card.style.marginTop='0.25rem';body.appendChild(card)});
       });
-      const orphans=clientTasks.filter(t=>t.parentId&&!clientTasks.find(p=>p.id===t.parentId));
-      orphans.forEach(t=>body.appendChild(createTaskCard(t)));
+      var orphans=clientTasks.filter(function(t){return t.parentId&&!clientTasks.find(function(p){return p.id===t.parentId})});
+      orphans.forEach(function(t){body.appendChild(createTaskCard(t))});
     }
     wrapper.appendChild(header);wrapper.appendChild(body);c.appendChild(wrapper);
   });
@@ -357,125 +379,170 @@ function renderProjectList(){
 
 function toggleAllAccordions(){
   allAccordionsOpen=!allAccordionsOpen;
-  document.querySelectorAll('.accordion-body').forEach(b=>{
-    if(allAccordionsOpen){b.classList.add('open');b.style.paddingTop='0.5rem'}else{b.classList.remove('open');b.style.paddingTop='0'}
-  });
-  document.querySelectorAll('.accordion-header i').forEach(i=>{i.style.transform=allAccordionsOpen?'rotate(180deg)':''});
+  var bodies=document.querySelectorAll('.accordion-body');
+  for(var i=0;i<bodies.length;i++){
+    if(allAccordionsOpen){bodies[i].classList.add('open');bodies[i].style.paddingTop='0.5rem'}
+    else{bodies[i].classList.remove('open');bodies[i].style.paddingTop='0'}
+  }
+  var icons=document.querySelectorAll('.accordion-header i');
+  for(var j=0;j<icons.length;j++){icons[j].style.transform=allAccordionsOpen?'rotate(180deg)':''}
   document.getElementById('toggle-all-accordion').textContent=allAccordionsOpen?'すべて閉じる':'すべて開く';
 }
 
 function renderBoard(){
-  const c=document.getElementById('board-container');c.innerHTML='';
-  const clients=getOrderedClients();
-  const count=clients.length;
+  var c=document.getElementById('board-container');c.innerHTML='';
+  var clients=getOrderedClients();
+  var count=clients.length;
   if(count===0)return;
-  const screenW=window.innerWidth;
-  let cardWidth;
+  var screenW=window.innerWidth;
+  var cardWidth;
   if(screenW<768){cardWidth='85vw'}
-  else{const available=screenW-48-(count-1)*16;cardWidth=Math.max(240,Math.floor(available/count))+'px'}
+  else{var available=screenW-48-(count-1)*16;cardWidth=Math.max(240,Math.floor(available/count))+'px'}
 
-  clients.forEach((name,idx)=>{
-    const color=getClientColor(name);
-    const clientTasks=tasks.filter(t=>t.clientName===name);
-    const card=document.createElement('div');card.className='board-card';card.style.width=cardWidth;card.style.minWidth=screenW<768?'85vw':cardWidth;
-    const header=document.createElement('div');header.className='board-card-header';header.style.backgroundColor=color.bg;header.style.color=color.text;
-    header.innerHTML=`<div class="flex items-center gap-2"><span>${name}</span><span class="text-xs opacity-60">${clientTasks.length}件</span></div><div class="flex gap-1">${idx>0?'<button class="move-btn" onclick="moveClient(\''+name+'\',-1)">◀</button>':''}${idx<count-1?'<button class="move-btn" onclick="moveClient(\''+name+'\',1)">▶</button>':''}</div>`;
-    const body=document.createElement('div');body.className='board-card-body';
+  clients.forEach(function(name,idx){
+    var color=getClientColor(name);
+    var clientTasks=tasks.filter(function(t){return t.clientName===name});
+    var card=document.createElement('div');card.className='board-card';card.style.width=cardWidth;card.style.minWidth=screenW<768?'85vw':cardWidth;
+    var header=document.createElement('div');header.className='board-card-header';header.style.backgroundColor=color.bg;header.style.color=color.text;
+
+    var headerLeft=document.createElement('div');headerLeft.className='flex items-center gap-2';
+    headerLeft.innerHTML='<span>'+name+'</span><span class="text-xs opacity-60">'+clientTasks.length+'件</span>';
+    var headerRight=document.createElement('div');headerRight.className='flex gap-1';
+
+    if(idx>0){
+      var leftBtn=document.createElement('button');leftBtn.className='move-btn';leftBtn.textContent='◀';
+      leftBtn.setAttribute('data-name',name);
+      leftBtn.addEventListener('click',function(){moveClient(this.getAttribute('data-name'),-1)});
+      headerRight.appendChild(leftBtn);
+    }
+    if(idx<count-1){
+      var rightBtn=document.createElement('button');rightBtn.className='move-btn';rightBtn.textContent='▶';
+      rightBtn.setAttribute('data-name',name);
+      rightBtn.addEventListener('click',function(){moveClient(this.getAttribute('data-name'),1)});
+      headerRight.appendChild(rightBtn);
+    }
+
+    header.appendChild(headerLeft);header.appendChild(headerRight);
+    var body=document.createElement('div');body.className='board-card-body';
     if(clientTasks.length===0){body.innerHTML='<p class="text-sm text-slate-400 py-3">タスクなし</p>'}
-    else{clientTasks.forEach(t=>{if(t.title)body.appendChild(createTaskCard(t))})}
+    else{clientTasks.forEach(function(t){if(t.title)body.appendChild(createTaskCard(t))})}
     card.appendChild(header);card.appendChild(body);c.appendChild(card);
   });
 }
 
 function moveClient(name,dir){
-  const clients=getOrderedClients();
-  const idx=clients.indexOf(name);if(idx<0)return;
-  const newIdx=idx+dir;if(newIdx<0||newIdx>=clients.length)return;
+  var clients=getOrderedClients();
+  var idx=clients.indexOf(name);if(idx<0)return;
+  var newIdx=idx+dir;if(newIdx<0||newIdx>=clients.length)return;
   clients.splice(idx,1);clients.splice(newIdx,0,name);
   clientOrder=clients;
-  apiCall({action:'saveClientOrder',order:clients.join(',')});
   renderAll();
+  apiCall({action:'saveClientOrder',order:clients.join(',')});
 }
 
-function changeMonth(dir){calendarMonth+=dir;if(calendarMonth>11){calendarMonth=0;calendarYear++}if(calendarMonth<0){calendarMonth=11;calendarYear--}renderCalendar();renderCalendarDetail()}
+function changeMonth(dir){
+  calendarMonth+=dir;
+  if(calendarMonth>11){calendarMonth=0;calendarYear++}
+  if(calendarMonth<0){calendarMonth=11;calendarYear--}
+  renderCalendar();renderCalendarDetail();
+}
 
 function renderCalendar(){
-  const grid=document.getElementById('calendar-grid');grid.innerHTML='';
-  const label=document.getElementById('calendar-month-label');
+  var grid=document.getElementById('calendar-grid');grid.innerHTML='';
+  var label=document.getElementById('calendar-month-label');
   label.textContent=calendarYear+'年'+(calendarMonth+1)+'月';
-  const dayNames=['月','火','水','木','金','土','日'];
-  dayNames.forEach((d,i)=>{const h=document.createElement('div');h.className='text-center text-[10px] font-bold py-2 '+(i===5?'text-blue-500':i===6?'text-red-500':'text-slate-400');h.textContent=d;grid.appendChild(h)});
-  const firstDay=new Date(calendarYear,calendarMonth,1);
-  let startDow=firstDay.getDay();startDow=(startDow===0?6:startDow-1);
-  const daysInMonth=new Date(calendarYear,calendarMonth+1,0).getDate();
-  const today=todayStr();
-  for(let i=0;i<startDow;i++){const blank=document.createElement('div');grid.appendChild(blank)}
-  for(let d=1;d<=daysInMonth;d++){
-    const dateStr=calendarYear+'-'+String(calendarMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-    const dow=new Date(calendarYear,calendarMonth,d).getDay();
-    const isHoliday=holidays[dateStr];
-    const cell=document.createElement('div');
+  var dayNames=['月','火','水','木','金','土','日'];
+  dayNames.forEach(function(d,i){
+    var h=document.createElement('div');
+    h.className='text-center text-[10px] font-bold py-2 '+(i===5?'text-blue-500':i===6?'text-red-500':'text-slate-400');
+    h.textContent=d;grid.appendChild(h);
+  });
+  var firstDay=new Date(calendarYear,calendarMonth,1);
+  var startDow=firstDay.getDay();startDow=(startDow===0?6:startDow-1);
+  var daysInMonth=new Date(calendarYear,calendarMonth+1,0).getDate();
+  var today=todayStr();
+  for(var i=0;i<startDow;i++){var blank=document.createElement('div');grid.appendChild(blank)}
+  for(var d=1;d<=daysInMonth;d++){
+    var dateStr=calendarYear+'-'+String(calendarMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var dow=new Date(calendarYear,calendarMonth,d).getDay();
+    var isHoliday=holidays[dateStr];
+    var cell=document.createElement('div');
     cell.className='calendar-day'+(dateStr===today?' today':'')+(dateStr===selectedDate?' selected':'')+(isHoliday?' holiday':'')+(dow===0?' sunday':'')+(dow===6?' saturday':'');
-    cell.onclick=()=>{selectedDate=dateStr;renderCalendar();renderCalendarDetail()};
-    const num=document.createElement('span');num.className='day-number text-xs font-bold';num.textContent=d;
+    cell.setAttribute('data-date',dateStr);
+    cell.addEventListener('click',function(){selectedDate=this.getAttribute('data-date');renderCalendar();renderCalendarDetail()});
+    var num=document.createElement('span');num.className='day-number text-xs font-bold';num.textContent=d;
     cell.appendChild(num);
-    if(isHoliday){const hl=document.createElement('span');hl.className='text-[7px] text-red-400 leading-tight text-center';hl.textContent=isHoliday;cell.appendChild(hl)}
-    const dayTasks=tasks.filter(t=>t.date===dateStr);
-    dayTasks.slice(0,3).forEach(t=>{const dot=document.createElement('div');dot.className='calendar-task-dot';const s=statusMap[t.status]||statusMap.todo;dot.style.backgroundColor=s.cls.includes('todo')?'#ef4444':s.cls.includes('doing')?'#3b82f6':s.cls.includes('reply')?'#f59e0b':'#64748b';cell.appendChild(dot)});
-    if(dayTasks.length>3){const more=document.createElement('span');more.className='text-[8px] text-slate-400';more.textContent='+'+(dayTasks.length-3);cell.appendChild(more)}
+    if(isHoliday){var hl=document.createElement('span');hl.className='text-[7px] text-red-400 leading-tight text-center';hl.textContent=isHoliday;cell.appendChild(hl)}
+    var dayTasks=tasks.filter(function(t){return t.date===dateStr});
+    dayTasks.slice(0,3).forEach(function(t){
+      var dot=document.createElement('div');dot.className='calendar-task-dot';
+      var st=statusMap[t.status]||statusMap.todo;
+      dot.style.backgroundColor=st.cls.indexOf('todo')>=0?'#ef4444':st.cls.indexOf('doing')>=0?'#3b82f6':st.cls.indexOf('reply')>=0?'#f59e0b':'#64748b';
+      cell.appendChild(dot);
+    });
+    if(dayTasks.length>3){var more=document.createElement('span');more.className='text-[8px] text-slate-400';more.textContent='+'+(dayTasks.length-3);cell.appendChild(more)}
     grid.appendChild(cell);
   }
   lucide.createIcons();
 }
 
 function renderCalendarDetail(){
-  const label=document.getElementById('calendar-detail-label');
-  const list=document.getElementById('calendar-task-list');
-  const badge=document.getElementById('task-count-badge');
+  var label=document.getElementById('calendar-detail-label');
+  var list=document.getElementById('calendar-task-list');
+  var badge=document.getElementById('task-count-badge');
   if(!selectedDate){label.textContent='日付を選択';list.innerHTML='';badge.classList.add('hidden');return}
-  const d=new Date(selectedDate+'T00:00:00');
+  var d=new Date(selectedDate+'T00:00:00');
   label.textContent=(d.getMonth()+1)+'月'+d.getDate()+'日（'+['日','月','火','水','木','金','土'][d.getDay()]+'）';
-  const hol=holidays[selectedDate];if(hol)label.textContent+=' '+hol;
-  const dayTasks=tasks.filter(t=>t.date===selectedDate);
-  badge.textContent=dayTasks.length+'件';badge.classList.toggle('hidden',dayTasks.length===0);
+  var hol=holidays[selectedDate];if(hol)label.textContent+=' '+hol;
+  var dayTasks=tasks.filter(function(t){return t.date===selectedDate});
+  badge.textContent=dayTasks.length+'件';
+  if(dayTasks.length>0)badge.classList.remove('hidden');else badge.classList.add('hidden');
   list.innerHTML='';
   if(dayTasks.length===0){list.innerHTML='<p class="text-sm text-slate-400 py-4">この日のタスクはありません</p>';return}
-  dayTasks.forEach(t=>list.appendChild(createTaskCard(t)));
+  dayTasks.forEach(function(t){list.appendChild(createTaskCard(t))});
   lucide.createIcons();
 }
 
 function toggleTask(id){
-  const t=tasks.find(x=>x.id===id);if(!t)return;
+  var t=tasks.find(function(x){return x.id===id});if(!t)return;
   apiCall({action:'save',id:t.id,clientName:t.clientName,title:t.title||'',date:t.date||'',parentId:t.parentId||'',status:t.status||'todo',completed:String(!t.completed)});
 }
 
 function cycleStatus(id){
-  const t=tasks.find(x=>x.id===id);if(!t)return;
-  const next=(statusMap[t.status]||statusMap.todo).next;
+  var t=tasks.find(function(x){return x.id===id});if(!t)return;
+  var next=(statusMap[t.status]||statusMap.todo).next;
   apiCall({action:'save',id:t.id,clientName:t.clientName,title:t.title||'',date:t.date||'',parentId:t.parentId||'',status:next,completed:String(t.completed)});
 }
 
 function startDelete(){
-  const id=document.getElementById('edit-task-id').value;if(!id)return;
-  const children=tasks.filter(t=>t.parentId===id);
+  var id=document.getElementById('edit-task-id').value;if(!id)return;
+  var children=tasks.filter(function(t){return t.parentId===id});
   if(children.length>0){pendingDeleteId=id;showChildModal();return}
-  if(confirm('このタスクを削除しますか？')){apiCall({action:'delete',id:id}).then(()=>closeModal())}
+  if(confirm('このタスクを削除しますか？')){apiCall({action:'delete',id:id}).then(function(){closeModal()})}
 }
 
 function showChildModal(){
-  document.getElementById('child-modal').innerHTML=`<div class="child-modal-bg"><div class="bg-white rounded-2xl w-full max-w-sm p-6 mx-4 shadow-2xl"><h3 class="font-bold mb-2">子タスクがあります</h3><p class="text-sm text-slate-500 mb-6">この親タスクに紐づく子タスクをどうしますか？</p><div class="space-y-2"><button onclick="confirmDeleteWithChildren()" class="w-full py-3 bg-red-500 text-white rounded-xl font-bold text-sm">子タスクも一緒に削除</button><button onclick="confirmPromoteChildren()" class="w-full py-3 bg-slate-100 text-slate-700 rounded-xl font-bold text-sm">子タスクを独立させる</button><button onclick="closeChildModal()" class="w-full py-3 text-slate-400 font-bold text-sm">キャンセル</button></div></div></div>`;
-  document.getElementById('child-modal').classList.remove('hidden');
+  var m=document.getElementById('child-modal');
+  m.innerHTML='<div class="child-modal-bg"><div class="bg-white rounded-2xl w-full max-w-sm p-6 mx-4 shadow-2xl"><h3 class="font-bold mb-2">子タスクがあります</h3><p class="text-sm text-slate-500 mb-6">この親タスクに紐づく子タスクをどうしますか？</p><div class="space-y-2"><button id="cm-delete" class="w-full py-3 bg-red-500 text-white rounded-xl font-bold text-sm">子タスクも一緒に削除</button><button id="cm-promote" class="w-full py-3 bg-slate-100 text-slate-700 rounded-xl font-bold text-sm">子タスクを独立させる</button><button id="cm-cancel" class="w-full py-3 text-slate-400 font-bold text-sm">キャンセル</button></div></div></div>';
+  m.classList.remove('hidden');
+  document.getElementById('cm-delete').addEventListener('click',confirmDeleteWithChildren);
+  document.getElementById('cm-promote').addEventListener('click',confirmPromoteChildren);
+  document.getElementById('cm-cancel').addEventListener('click',closeChildModal);
 }
 
 function confirmDeleteWithChildren(){
   if(!pendingDeleteId)return;
-  apiCall({action:'deleteChildren',parentId:pendingDeleteId}).then(()=>apiCall({action:'delete',id:pendingDeleteId})).then(()=>{closeChildModal();closeModal()});
+  var pid=pendingDeleteId;
+  apiCall({action:'deleteChildren',parentId:pid}).then(function(){return apiCall({action:'delete',id:pid})}).then(function(){closeChildModal();closeModal()});
 }
 function confirmPromoteChildren(){
   if(!pendingDeleteId)return;
-  apiCall({action:'promoteChildren',parentId:pendingDeleteId}).then(()=>apiCall({action:'delete',id:pendingDeleteId})).then(()=>{closeChildModal();closeModal()});
+  var pid=pendingDeleteId;
+  apiCall({action:'promoteChildren',parentId:pid}).then(function(){return apiCall({action:'delete',id:pid})}).then(function(){closeChildModal();closeModal()});
 }
-function closeChildModal(){document.getElementById('child-modal').classList.add('hidden');document.getElementById('child-modal').innerHTML='';pendingDeleteId=null}
+function closeChildModal(){
+  var m=document.getElementById('child-modal');m.classList.add('hidden');m.innerHTML='';pendingDeleteId=null;
+}
 
 function setModalTab(tab){
   modalTab=tab;
@@ -497,34 +564,34 @@ function openModal(){
 }
 
 function openEditModal(id){
-  const t=tasks.find(x=>x.id===id);if(!t)return;
+  var t=tasks.find(function(x){return x.id===id});if(!t)return;
   document.getElementById('edit-task-id').value=t.id;
   document.getElementById('client-name').value=t.clientName||'';
   document.getElementById('task-title').value=t.title||'';
   document.getElementById('task-date').value=t.date||'';
-  document.getElementById('parent-id').value=t.parentId||'';
   document.getElementById('task-status').value=t.status||'todo';
   document.getElementById('modal-title').textContent='作業の編集';
   document.getElementById('delete-task-btn').classList.remove('hidden');
   document.getElementById('modal-tabs').style.display='none';
   setModalTab('task');
   updateFormHelpers();
+  document.getElementById('parent-id').value=t.parentId||'';
   document.getElementById('task-modal').classList.remove('hidden');
   document.getElementById('task-modal').style.display='flex';
 }
 
 function handleSubmit(e){
   e.preventDefault();if(isSaving)return false;
-  const id=document.getElementById('edit-task-id').value||Date.now().toString();
-  const clientName=document.getElementById('client-name').value.trim();
+  var id=document.getElementById('edit-task-id').value||Date.now().toString();
+  var clientName=document.getElementById('client-name').value.trim();
   if(!clientName){showToast('クライアント名を入力してください','error');return false}
-  const title=modalTab==='client'?'':document.getElementById('task-title').value.trim();
-  const date=modalTab==='client'?'':document.getElementById('task-date').value;
-  const parentId=modalTab==='client'?'':document.getElementById('parent-id').value;
-  const status=modalTab==='client'?'todo':document.getElementById('task-status').value;
-  const existing=tasks.find(x=>x.id===document.getElementById('edit-task-id').value);
-  const completed=existing?String(existing.completed):'false';
-  apiCall({action:'save',id:id,clientName:clientName,title:title,date:date,parentId:parentId,status:status,completed:completed}).then(()=>closeModal());
+  var title=modalTab==='client'?'':document.getElementById('task-title').value.trim();
+  var date=modalTab==='client'?'':document.getElementById('task-date').value;
+  var parentId=modalTab==='client'?'':document.getElementById('parent-id').value;
+  var status=modalTab==='client'?'todo':document.getElementById('task-status').value;
+  var existing=tasks.find(function(x){return x.id===document.getElementById('edit-task-id').value});
+  var completed=existing?String(existing.completed):'false';
+  apiCall({action:'save',id:id,clientName:clientName,title:title,date:date,parentId:parentId,status:status,completed:completed}).then(function(){closeModal()});
   return false;
 }
 
@@ -534,18 +601,21 @@ function closeModal(){
 }
 
 function updateFormHelpers(){
-  const dl=document.getElementById('client-list');dl.innerHTML='';
-  const clients=[...new Set(tasks.map(t=>t.clientName).filter(Boolean))];
-  clients.forEach(c=>{const o=document.createElement('option');o.value=c;dl.appendChild(o)});
-  const ps=document.getElementById('parent-id');
-  const currentVal=ps.value;ps.innerHTML='<option value="">(なし)</option>';
-  tasks.filter(t=>t.title&&!t.parentId).forEach(t=>{const o=document.createElement('option');o.value=t.id;o.textContent=(t.clientName?t.clientName+' / ':'')+t.title;ps.appendChild(o)});
+  var dl=document.getElementById('client-list');dl.innerHTML='';
+  var clients=[];
+  tasks.forEach(function(t){if(t.clientName&&clients.indexOf(t.clientName)===-1)clients.push(t.clientName)});
+  clients.forEach(function(c){var o=document.createElement('option');o.value=c;dl.appendChild(o)});
+  var ps=document.getElementById('parent-id');
+  var currentVal=ps.value;ps.innerHTML='<option value="">(なし)</option>';
+  tasks.filter(function(t){return t.title&&!t.parentId}).forEach(function(t){
+    var o=document.createElement('option');o.value=t.id;o.textContent=(t.clientName?t.clientName+' / ':'')+t.title;ps.appendChild(o);
+  });
   ps.value=currentVal;
 }
 
 function switchView(v){
   currentView=v;
-  ['list','board','calendar'].forEach(id=>{
+  ['list','board','calendar'].forEach(function(id){
     document.getElementById(id+'-view').classList.toggle('hidden',id!==v);
     document.getElementById('btn-'+id).classList.toggle('active',id===v);
   });
@@ -557,12 +627,12 @@ function toggleCompletedVisibility(){
   document.getElementById('content-area').classList.toggle('hide-completed',document.getElementById('toggle-completed').checked);
 }
 
-window.addEventListener('online',()=>{document.getElementById('offline-badge').classList.add('hidden');fetchTasks()});
-window.addEventListener('offline',()=>{document.getElementById('offline-badge').classList.remove('hidden')});
-window.addEventListener('resize',()=>{if(currentView==='board')renderBoard()});
+window.addEventListener('online',function(){document.getElementById('offline-badge').classList.add('hidden');fetchTasks()});
+window.addEventListener('offline',function(){document.getElementById('offline-badge').classList.remove('hidden')});
+window.addEventListener('resize',function(){if(currentView==='board')renderBoard()});
 
-window.onload=()=>{
-  const opts={month:'long',day:'numeric',weekday:'long'};
+window.onload=function(){
+  var opts={month:'long',day:'numeric',weekday:'long'};
   document.getElementById('date-label').textContent='今日: '+new Date().toLocaleDateString('ja-JP',opts);
   lucide.createIcons();
   document.getElementById('password-input').focus();
