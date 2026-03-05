@@ -40,9 +40,15 @@
         .date-badge { font-size: 10px; font-weight: 500; color: #64748b; background: #f1f5f9; padding: 1px 6px; border-radius: 4px; }
         .delete-btn { font-size: 10px; color: #ef4444; background: #fef2f2; border: 1px solid #fee2e2; padding: 2px 8px; border-radius: 8px; cursor: pointer; }
         .delete-btn:active { background: #fee2e2; }
+        .loading-overlay { position: fixed; inset: 0; background: white; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     </style>
 </head>
 <body class="text-slate-800">
+    <div id="loading" class="loading-overlay">
+        <div class="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin mb-4"></div>
+        <p class="text-sm font-bold text-slate-500">データを読み込み中...</p>
+    </div>
+
     <div id="app" class="flex flex-col h-screen max-w-2xl mx-auto bg-white shadow-xl relative overflow-hidden">
         <header class="pt-12 pb-4 px-6 shrink-0 bg-white/90 backdrop-blur-md z-30 sticky top-0 border-b border-slate-200">
             <div class="flex items-center justify-between mb-1">
@@ -141,6 +147,8 @@
     </div>
 
     <script>
+        const API_URL = 'https://script.google.com/macros/s/AKfycbynJMq_uSA8B-InscpS2GO_FVM7353ng2SGu6xHI_elo0hiF6xjd9f069aoNx99umkp/exec';
+
         const statusMap = {
             'todo': { label: '未対応', class: 'status-todo' },
             'doing': { label: '対応中', class: 'status-doing' },
@@ -152,14 +160,40 @@
         let selectedDate = new Date().toISOString().split('T')[0];
         let currentView = 'list';
 
-        // --- localStorage でデータ保存 ---
-        function loadTasks() {
-            const data = localStorage.getItem('client-manager-tasks');
-            tasks = data ? JSON.parse(data) : [];
+        // --- API通信 ---
+        async function fetchTasks() {
+            try {
+                const res = await fetch(API_URL + '?action=getAll');
+                tasks = await res.json();
+                document.getElementById('loading').classList.add('hidden');
+                renderAll();
+            } catch (e) {
+                console.error('読み込みエラー:', e);
+                document.getElementById('loading').innerHTML = '<p class="text-sm font-bold text-red-500">読み込みに失敗しました。ページを更新してください。</p>';
+            }
         }
 
-        function saveTasks() {
-            localStorage.setItem('client-manager-tasks', JSON.stringify(tasks));
+        async function saveTaskToServer(data) {
+            const params = new URLSearchParams(data);
+            params.append('action', 'save');
+            try {
+                await fetch(API_URL, { method: 'POST', body: params });
+                await fetchTasks();
+            } catch (e) {
+                console.error('保存エラー:', e);
+                alert('保存に失敗しました。もう一度お試しください。');
+            }
+        }
+
+        async function deleteTaskFromServer(id) {
+            const params = new URLSearchParams({ action: 'delete', id: id });
+            try {
+                await fetch(API_URL, { method: 'POST', body: params });
+                await fetchTasks();
+            } catch (e) {
+                console.error('削除エラー:', e);
+                alert('削除に失敗しました。');
+            }
         }
 
         // --- 描画 ---
@@ -212,6 +246,10 @@
             const container = document.getElementById('project-container');
             container.innerHTML = '';
             const clients = [...new Set(tasks.map(t => t.clientName))];
+            if (clients.length === 0) {
+                container.innerHTML = '<p class="text-slate-300 text-sm py-2">右下の＋ボタンからタスクを追加してください</p>';
+                return;
+            }
             clients.forEach(clientName => {
                 const clientSection = document.createElement('div');
                 clientSection.className = "mb-6";
@@ -296,23 +334,31 @@
         }
 
         // --- 操作 ---
-        function toggleTask(id) {
-            const t = tasks.find(x => x.id === id);
+        async function toggleTask(id) {
+            const t = tasks.find(x => x.id == id);
             if (t) {
                 t.completed = !t.completed;
-                saveTasks();
                 renderAll();
+                await saveTaskToServer({
+                    id: t.id,
+                    clientName: t.clientName,
+                    title: t.title,
+                    date: t.date || '',
+                    parentId: t.parentId || '',
+                    status: t.status,
+                    completed: t.completed.toString()
+                });
             }
         }
 
         function openEditModal(id) {
-            const t = tasks.find(x => x.id === id);
+            const t = tasks.find(x => x.id == id);
             if (!t) return;
             document.getElementById('modal-title').innerText = "作業の編集";
             document.getElementById('edit-task-id').value = t.id;
             document.getElementById('client-name').value = t.clientName;
             document.getElementById('task-title').value = t.title;
-            document.getElementById('task-date').value = t.date;
+            document.getElementById('task-date').value = t.date || '';
             document.getElementById('parent-id').value = t.parentId || "";
             document.getElementById('task-status').value = t.status;
             document.getElementById('delete-task-btn').classList.remove('hidden');
@@ -320,38 +366,30 @@
             updateFormHelpers();
         }
 
-        function deleteTask() {
+        async function deleteTask() {
             const id = document.getElementById('edit-task-id').value;
             if (!id) return;
             if (confirm('この作業を削除しますか？')) {
-                tasks = tasks.filter(t => t.id !== id && t.parentId !== id);
-                saveTasks();
                 closeModal();
-                renderAll();
+                await deleteTaskFromServer(id);
             }
         }
 
-        document.getElementById('task-form').onsubmit = (e) => {
+        document.getElementById('task-form').onsubmit = async (e) => {
             e.preventDefault();
             const id = document.getElementById('edit-task-id').value || Date.now().toString();
-            const existing = tasks.find(t => t.id === id);
+            const existing = tasks.find(t => t.id == id);
             const data = {
                 id: id,
                 clientName: document.getElementById('client-name').value || "未分類",
                 title: document.getElementById('task-title').value,
                 date: document.getElementById('task-date').value,
-                parentId: document.getElementById('parent-id').value || null,
+                parentId: document.getElementById('parent-id').value || '',
                 status: document.getElementById('task-status').value,
-                completed: existing ? existing.completed : false
+                completed: existing ? existing.completed.toString() : 'false'
             };
-            if (existing) {
-                Object.assign(existing, data);
-            } else {
-                tasks.push(data);
-            }
-            saveTasks();
             closeModal();
-            renderAll();
+            await saveTaskToServer(data);
         };
 
         function switchView(view) {
@@ -395,10 +433,9 @@
 
         // --- 起動 ---
         window.onload = () => {
-            loadTasks();
             const options = { month: 'long', day: 'numeric', weekday: 'long' };
             document.getElementById('date-label').innerText = "今日: " + new Date().toLocaleDateString('ja-JP', options);
-            renderAll();
+            fetchTasks();
         };
     </script>
 </body>
