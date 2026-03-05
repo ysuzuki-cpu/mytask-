@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Client Manager Cloud</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="クライアント管理">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.321.0/dist/umd/lucide.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, query, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables provided by environment
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        window.db = db;
+        window.auth = auth;
+        window.appId = appId;
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+        :root { --bg-main: #f1f5f9; }
+        body { 
+            font-family: 'Inter', 'Noto Sans JP', sans-serif; 
+            background-color: var(--bg-main);
+            overscroll-behavior-y: contain;
+            padding-top: env(safe-area-inset-top);
+        }
+        .hierarchy-line { position: absolute; left: 1.25rem; top: 0; bottom: 0; width: 2px; background-color: #e2e8f0; z-index: 0; }
+        .subtask-node { position: relative; padding-left: 2.5rem; }
+        .subtask-node::before { content: ""; position: absolute; left: 1.25rem; top: 1.25rem; width: 1rem; height: 2px; background-color: #e2e8f0; }
+        .task-panel { background-color: white; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.04); transition: transform 0.1s; }
+        .task-panel:active { transform: scale(0.98); }
+        .status-tag { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 9999px; text-transform: uppercase; }
+        .status-todo { background-color: #fef2f2; color: #ef4444; border: 1px solid #fee2e2; }
+        .status-doing { background-color: #eff6ff; color: #3b82f6; border: 1px solid #dbeafe; }
+        .status-reply { background-color: #fff7ed; color: #f59e0b; border: 1px solid #ffedd5; }
+        .status-waiting { background-color: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+        .custom-checkbox { appearance: none; width: 1.25rem; height: 1.25rem; border: 2px solid #cbd5e1; border-radius: 9999px; cursor: pointer; position: relative; background: white; }
+        .custom-checkbox:checked { background-color: #10b981; border-color: #10b981; }
+        .custom-checkbox:checked::after { content: "✓"; position: absolute; color: white; font-size: 0.75rem; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+        .task-completed { opacity: 0.5; text-decoration: line-through; }
+        .calendar-day-active { background-color: #f8fafc; box-shadow: inset 0 0 0 2px #0f172a; }
+        .calendar-task-label { font-size: 8px; line-height: 1; padding: 2px 4px; border-radius: 2px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; display: block; }
+        html, body { position: fixed; overflow: hidden; width: 100%; height: 100%; }
+        #app { height: 100%; overflow: hidden; }
+        .date-badge { font-size: 10px; font-weight: 500; color: #64748b; background: #f1f5f9; padding: 1px 6px; border-radius: 4px; }
+        .loading-overlay { position: fixed; inset: 0; background: white; z-index: 100; display: flex; flex-direction: column; items-center; justify-content: center; }
+    </style>
+</head>
+<body class="text-slate-800">
+    <div id="loading" class="loading-overlay">
+        <div class="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin mb-4"></div>
+        <p class="text-sm font-bold text-slate-500">クラウドと同期中...</p>
+    </div>
+
+    <div id="app" class="flex flex-col h-screen max-w-2xl mx-auto bg-white shadow-xl relative overflow-hidden">
+        <header class="pt-12 pb-4 px-6 shrink-0 bg-white/90 backdrop-blur-md z-30 sticky top-0 border-b border-slate-200">
+            <div class="flex items-center justify-between mb-1">
+                <h1 id="view-title" class="text-2xl font-bold tracking-tight text-slate-900">Workspace</h1>
+                <div class="flex gap-2">
+                    <button onclick="switchView('list')" id="btn-list" class="p-2 rounded-xl bg-slate-900 text-white shadow-md">
+                        <i data-lucide="list" class="w-5 h-5"></i>
+                    </button>
+                    <button onclick="switchView('calendar')" id="btn-calendar" class="p-2 rounded-xl text-slate-400 hover:bg-slate-50">
+                        <i data-lucide="calendar" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="flex items-center justify-between">
+                <p id="date-label" class="text-xs font-medium text-slate-400">Loading...</p>
+                <p id="user-id-display" class="text-[9px] text-slate-300 font-mono"></p>
+            </div>
+        </header>
+
+        <main id="content-area" class="flex-1 overflow-y-auto pb-32 bg-slate-50">
+            <div id="list-view" class="p-6 space-y-8">
+                <section>
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="w-1.5 h-6 bg-amber-400 rounded-full"></span>
+                        <h2 class="font-bold text-lg">今日明日の予定</h2>
+                    </div>
+                    <div id="summary-container" class="space-y-3"></div>
+                </section>
+                <section>
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="w-1.5 h-6 bg-slate-300 rounded-full"></span>
+                        <h2 class="font-bold text-lg">クライアント別タスク</h2>
+                    </div>
+                    <div id="project-container" class="space-y-6"></div>
+                </section>
+            </div>
+            <div id="calendar-view" class="hidden">
+                <div id="calendar-scroll-container" class="p-4 space-y-8"></div>
+                <div id="selected-date-tasks" class="p-6 border-t border-slate-200 bg-white min-h-[200px]">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 id="calendar-detail-label" class="font-bold text-slate-900">日付を選択</h4>
+                        <span id="task-count-badge" class="hidden px-2 py-1 bg-slate-900 text-white text-[10px] rounded-lg"></span>
+                    </div>
+                    <div id="calendar-task-list" class="space-y-3"></div>
+                </div>
+            </div>
+        </main>
+
+        <button onclick="openModal()" class="fixed bottom-8 right-8 w-16 h-16 bg-slate-900 text-white rounded-2xl shadow-2xl flex items-center justify-center z-40 active:scale-95 transition-transform">
+            <i data-lucide="plus" class="w-8 h-8"></i>
+        </button>
+    </div>
+
+    <!-- Modal -->
+    <div id="task-modal" class="fixed inset-0 bg-slate-900/40 hidden items-end sm:items-center justify-center z-50 p-0 sm:p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-t-[2.5rem] sm:rounded-[2rem] w-full max-w-md p-8 shadow-2xl">
+            <h3 id="modal-title" class="text-xl font-bold mb-8">作業の追加</h3>
+            <form id="task-form" class="space-y-5">
+                <input type="hidden" id="edit-task-id">
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-slate-400 uppercase">クライアント名</label>
+                    <input type="text" id="client-name" list="client-list" placeholder="新規入力または選択" class="w-full px-5 py-4 bg-slate-50 rounded-2xl outline-none border-none">
+                    <datalist id="client-list"></datalist>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-slate-400 uppercase">作業内容（タイトル）</label>
+                    <input type="text" id="task-title" required placeholder="具体的な作業名" class="w-full px-5 py-4 bg-slate-50 rounded-2xl outline-none border-none text-lg">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-slate-400 uppercase">期限</label>
+                        <input type="date" id="task-date" class="w-full bg-slate-50 px-4 py-4 rounded-2xl border-none text-sm">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-slate-400 uppercase">所属（親作業）</label>
+                        <select id="parent-id" class="w-full bg-slate-50 px-4 py-4 rounded-2xl border-none text-sm appearance-none">
+                            <option value="">(なし: 親作業として登録)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-slate-400 uppercase">状況</label>
+                    <select id="task-status" class="w-full bg-slate-50 px-4 py-4 rounded-2xl border-none text-sm appearance-none">
+                        <option value="todo">未対応</option>
+                        <option value="doing">対応中</option>
+                        <option value="reply">返信待ち</option>
+                        <option value="waiting">保留</option>
+                    </select>
+                </div>
+                <div class="flex gap-4 pt-4">
+                    <button type="button" onclick="closeModal()" class="flex-1 py-4 text-slate-400 font-bold">キャンセル</button>
+                    <button type="submit" class="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-lg">決定</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { doc, setDoc, onSnapshot, collection, query, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        const statusMap = {
+            'todo': { label: '未対応', class: 'status-todo' },
+            'doing': { label: '対応中', class: 'status-doing' },
+            'reply': { label: '返信待ち', class: 'status-reply' },
+            'waiting': { label: '保留', class: 'status-waiting' }
+        };
+
+        window.tasks = [];
+        window.user = null;
+        let selectedDate = new Date().toISOString().split('T')[0];
+        let currentView = 'list';
+
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(window.auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(window.auth);
+                }
+            } catch (error) {
+                console.error("Auth error:", error);
+            }
+        }
+
+        onAuthStateChanged(window.auth, (u) => {
+            window.user = u;
+            if (u) {
+                document.getElementById('user-id-display').innerText = `ID: ${u.uid}`;
+                syncData();
+            }
+        });
+
+        function syncData() {
+            if (!window.user) return;
+            const tasksRef = collection(window.db, 'artifacts', window.appId, 'users', window.user.uid, 'tasks');
+            
+            onSnapshot(tasksRef, (snapshot) => {
+                window.tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                document.getElementById('loading').classList.add('hidden');
+                renderAll();
+            }, (error) => {
+                console.error("Sync error:", error);
+            });
+        }
+
+        window.renderAll = function() {
+            renderSummary();
+            renderProjectList();
+            updateFormHelpers();
+            if (currentView === 'calendar') {
+                renderCalendar();
+                renderCalendarDetail();
+            }
+            lucide.createIcons();
+        };
+
+        function createTaskCard(t) {
+            const item = document.createElement('div');
+            const status = statusMap[t.status || 'todo'];
+            item.className = `task-panel p-4 rounded-2xl flex items-center gap-4 ${t.completed ? 'task-completed' : ''}`;
+            item.innerHTML = `
+                <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="toggleTask('${t.id}')" class="custom-checkbox">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                        <p class="text-sm font-bold text-slate-700 truncate cursor-pointer" onclick="openEditModal('${t.id}')">${t.title}</p>
+                        ${!t.completed ? `<span class="status-tag shrink-0 ${status.class}">${status.label}</span>` : ''}
+                    </div>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-[10px] text-slate-400 font-medium">${t.clientName}</span>
+                        ${t.date ? `<span class="date-badge">${t.date.split('-').slice(1).join('/')}</span>` : ''}
+                    </div>
+                </div>
+            `;
+            return item;
+        }
+
+        function renderSummary() {
+            const container = document.getElementById('summary-container');
+            container.innerHTML = '';
+            const todayStr = new Date().toISOString().split('T')[0];
+            const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+            const tomorrowStr = tomorrow.toISOString().split('T')[0];
+            const recent = window.tasks.filter(t => t.date && (t.date === todayStr || t.date === tomorrowStr)).sort((a,b) => a.completed - b.completed);
+            if (recent.length === 0) { container.innerHTML = '<p class="text-slate-300 text-sm py-2">直近の予定はありません</p>'; return; }
+            recent.forEach(t => container.appendChild(createTaskCard(t)));
+        }
+
+        function renderProjectList() {
+            const container = document.getElementById('project-container');
+            container.innerHTML = '';
+            const clients = [...new Set(window.tasks.map(t => t.clientName))];
+            clients.forEach(clientName => {
+                const clientSection = document.createElement('div');
+                clientSection.className = "mb-6";
+                clientSection.innerHTML = `
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm"><i data-lucide="user-round" class="w-4 h-4"></i></div>
+                        <h3 class="font-bold text-slate-900 text-sm">${clientName}</h3>
+                    </div>
+                    <div class="relative ml-2">
+                        <div class="hierarchy-line"></div>
+                        <div id="client-tasks-${clientName.replace(/\s+/g, '')}" class="space-y-3"></div>
+                    </div>
+                `;
+                container.appendChild(clientSection);
+                const taskContainer = document.getElementById(`client-tasks-${clientName.replace(/\s+/g, '')}`);
+                const parentTasks = window.tasks.filter(t => t.clientName === clientName && !t.parentId);
+                parentTasks.forEach(pt => {
+                    const ptNode = document.createElement('div');
+                    ptNode.appendChild(createTaskCard(pt));
+                    const subContainer = document.createElement('div');
+                    subContainer.className = "subtask-node space-y-2 mt-2";
+                    window.tasks.filter(t => t.parentId === pt.id).forEach(st => subContainer.appendChild(createTaskCard(st)));
+                    ptNode.appendChild(subContainer);
+                    taskContainer.appendChild(ptNode);
+                });
+            });
+        }
+
+        function renderCalendar() {
+            const container = document.getElementById('calendar-scroll-container');
+            container.innerHTML = '';
+            const now = new Date();
+            for (let i = 0; i < 2; i++) {
+                const monthDate = new Date(now.getFullYear(), now.getMonth() + i, 1);
+                const monthBox = document.createElement('div');
+                monthBox.innerHTML = `<h3 class="font-bold mb-4 text-slate-500 px-2 text-sm">${monthDate.getFullYear()}年 ${monthDate.getMonth() + 1}月</h3>`;
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-7 gap-1 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm';
+                ['月','火','水','木','金','土','日'].forEach(d => {
+                    const h = document.createElement('div'); h.className = 'text-[10px] font-bold text-slate-300 text-center pb-2'; h.innerText = d; grid.appendChild(h);
+                });
+                const startDay = (new Date(monthDate.getFullYear(), monthDate.getMonth(), 1).getDay() + 6) % 7;
+                for(let s=0; s<startDay; s++) grid.appendChild(document.createElement('div'));
+                const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const dateStr = `${monthDate.getFullYear()}-${String(monthDate.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                    const dayTasks = window.tasks.filter(t => t.date === dateStr);
+                    const cell = document.createElement('div');
+                    cell.className = `min-h-[60px] p-1 flex flex-col items-center rounded-lg cursor-pointer transition-all ${selectedDate === dateStr ? 'calendar-day-active' : 'hover:bg-slate-50'}`;
+                    cell.onclick = () => { selectedDate = dateStr; window.renderAll(); };
+                    cell.innerHTML = `<span class="text-[10px] font-bold mb-1 ${dayTasks.some(t=>!t.completed) ? 'text-slate-900' : 'text-slate-300'}">${d}</span>`;
+                    dayTasks.slice(0, 2).forEach(t => {
+                        const label = document.createElement('span');
+                        label.className = `calendar-task-label ${t.completed ? 'opacity-40 line-through bg-slate-100' : 'bg-slate-900 text-white font-medium'}`;
+                        label.innerText = t.title; cell.appendChild(label);
+                    });
+                    grid.appendChild(cell);
+                }
+                monthBox.appendChild(grid); container.appendChild(monthBox);
+            }
+        }
+
+        function renderCalendarDetail() {
+            const list = document.getElementById('calendar-task-list');
+            const label = document.getElementById('calendar-detail-label');
+            const badge = document.getElementById('task-count-badge');
+            list.innerHTML = '';
+            const dayTasks = window.tasks.filter(t => t.date === selectedDate).sort((a, b) => a.completed - b.completed);
+            const d = new Date(selectedDate);
+            label.innerText = `${d.getMonth()+1}月${d.getDate()}日の予定`;
+            if (dayTasks.length > 0) {
+                badge.innerText = `${dayTasks.length}件`; badge.classList.remove('hidden');
+                dayTasks.forEach(t => list.appendChild(createTaskCard(t)));
+            } else { badge.classList.add('hidden'); list.innerHTML = '<p class="text-slate-300 text-xs text-center py-8">この日の予定はありません</p>'; }
+        }
+
+        window.toggleTask = async function(id) {
+            if (!window.user) return;
+            const t = window.tasks.find(x => x.id === id);
+            if (t) {
+                const taskRef = doc(window.db, 'artifacts', window.appId, 'users', window.user.uid, 'tasks', id);
+                await setDoc(taskRef, { completed: !t.completed }, { merge: true });
+            }
+        };
+
+        window.openEditModal = function(id) {
+            const t = window.tasks.find(x => x.id === id);
+            if (!t) return;
+            document.getElementById('modal-title').innerText = "作業の編集";
+            document.getElementById('edit-task-id').value = t.id;
+            document.getElementById('client-name').value = t.clientName;
+            document.getElementById('task-title').value = t.title;
+            document.getElementById('task-date').value = t.date;
+            document.getElementById('parent-id').value = t.parentId || "";
+            document.getElementById('task-status').value = t.status;
+            document.getElementById('task-modal').classList.replace('hidden', 'flex');
+            updateFormHelpers();
+        };
+
+        document.getElementById('task-form').onsubmit = async (e) => {
+            e.preventDefault();
+            if (!window.user) return;
+            const id = document.getElementById('edit-task-id').value || Date.now().toString();
+            const data = {
+                clientName: document.getElementById('client-name').value || "未分類",
+                title: document.getElementById('task-title').value,
+                date: document.getElementById('task-date').value,
+                parentId: document.getElementById('parent-id').value || null,
+                status: document.getElementById('task-status').value,
+                completed: false,
+                updatedAt: new Date().toISOString()
+            };
+            const taskRef = doc(window.db, 'artifacts', window.appId, 'users', window.user.uid, 'tasks', id);
+            await setDoc(taskRef, data, { merge: true });
+            closeModal();
+        };
+
+        window.switchView = function(view) {
+            currentView = view;
+            const isList = view === 'list';
+            document.getElementById('list-view').classList.toggle('hidden', !isList);
+            document.getElementById('calendar-view').classList.toggle('hidden', isList);
+            document.getElementById('view-title').innerText = isList ? 'Workspace' : 'Calendar';
+            document.getElementById('btn-list').className = isList ? 'p-2 rounded-xl bg-slate-900 text-white shadow-md' : 'p-2 rounded-xl text-slate-400';
+            document.getElementById('btn-calendar').className = !isList ? 'p-2 rounded-xl bg-slate-900 text-white shadow-md' : 'p-2 rounded-xl text-slate-400';
+            window.renderAll();
+        };
+
+        window.updateFormHelpers = function() {
+            const clientList = document.getElementById('client-list');
+            const uniqueClients = [...new Set(window.tasks.map(t => t.clientName))];
+            clientList.innerHTML = uniqueClients.map(c => `<option value="${c}">`).join('');
+            const parentSelect = document.getElementById('parent-id');
+            const currentVal = parentSelect.value;
+            const editingId = document.getElementById('edit-task-id').value;
+            parentSelect.innerHTML = '<option value="">(なし: 親作業として登録)</option>';
+            window.tasks.filter(t => !t.parentId && t.id !== editingId).forEach(t => {
+                parentSelect.innerHTML += `<option value="${t.id}">${t.clientName}: ${t.title}</option>`;
+            });
+            parentSelect.value = currentVal;
+        };
+
+        window.updateHeaderDate = function() {
+            const options = { month: 'long', day: 'numeric', weekday: 'long' };
+            document.getElementById('date-label').innerText = "今日: " + new Date().toLocaleDateString('ja-JP', options);
+        };
+
+        window.openModal = function() {
+            document.getElementById('modal-title').innerText = "作業の追加";
+            document.getElementById('edit-task-id').value = "";
+            document.getElementById('task-form').reset();
+            document.getElementById('task-date').value = selectedDate;
+            document.getElementById('task-modal').classList.replace('hidden', 'flex');
+            updateFormHelpers();
+        };
+
+        window.closeModal = function() { document.getElementById('task-modal').classList.replace('flex', 'hidden'); };
+
+        window.onload = () => {
+            initAuth();
+            window.updateHeaderDate();
+            lucide.createIcons();
+        };
+    </script>
+</body>
+</html>
