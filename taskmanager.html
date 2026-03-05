@@ -3,37 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Client Manager Cloud</title>
+    <title>Client Manager</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="クライアント管理">
-    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.321.0/dist/umd/lucide.min.js"></script>
-    
-    <!-- Firebase SDK -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, query, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Global variables provided by environment
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-        window.db = db;
-        window.auth = auth;
-        window.appId = appId;
-    </script>
-
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap');
         :root { --bg-main: #f1f5f9; }
-        body { 
-            font-family: 'Inter', 'Noto Sans JP', sans-serif; 
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
             background-color: var(--bg-main);
             overscroll-behavior-y: contain;
             padding-top: env(safe-area-inset-top);
@@ -48,24 +28,21 @@
         .status-doing { background-color: #eff6ff; color: #3b82f6; border: 1px solid #dbeafe; }
         .status-reply { background-color: #fff7ed; color: #f59e0b; border: 1px solid #ffedd5; }
         .status-waiting { background-color: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
-        .custom-checkbox { appearance: none; width: 1.25rem; height: 1.25rem; border: 2px solid #cbd5e1; border-radius: 9999px; cursor: pointer; position: relative; background: white; }
+        .custom-checkbox { appearance: none; width: 1.25rem; height: 1.25rem; border: 2px solid #cbd5e1; border-radius: 9999px; cursor: pointer; position: relative; background: white; flex-shrink: 0; }
         .custom-checkbox:checked { background-color: #10b981; border-color: #10b981; }
         .custom-checkbox:checked::after { content: "✓"; position: absolute; color: white; font-size: 0.75rem; left: 50%; top: 50%; transform: translate(-50%, -50%); }
-        .task-completed { opacity: 0.5; text-decoration: line-through; }
+        .task-completed { opacity: 0.5; }
+        .task-completed .task-title-text { text-decoration: line-through; }
         .calendar-day-active { background-color: #f8fafc; box-shadow: inset 0 0 0 2px #0f172a; }
         .calendar-task-label { font-size: 8px; line-height: 1; padding: 2px 4px; border-radius: 2px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; display: block; }
         html, body { position: fixed; overflow: hidden; width: 100%; height: 100%; }
         #app { height: 100%; overflow: hidden; }
         .date-badge { font-size: 10px; font-weight: 500; color: #64748b; background: #f1f5f9; padding: 1px 6px; border-radius: 4px; }
-        .loading-overlay { position: fixed; inset: 0; background: white; z-index: 100; display: flex; flex-direction: column; items-center; justify-content: center; }
+        .delete-btn { font-size: 10px; color: #ef4444; background: #fef2f2; border: 1px solid #fee2e2; padding: 2px 8px; border-radius: 8px; cursor: pointer; }
+        .delete-btn:active { background: #fee2e2; }
     </style>
 </head>
 <body class="text-slate-800">
-    <div id="loading" class="loading-overlay">
-        <div class="w-12 h-12 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin mb-4"></div>
-        <p class="text-sm font-bold text-slate-500">クラウドと同期中...</p>
-    </div>
-
     <div id="app" class="flex flex-col h-screen max-w-2xl mx-auto bg-white shadow-xl relative overflow-hidden">
         <header class="pt-12 pb-4 px-6 shrink-0 bg-white/90 backdrop-blur-md z-30 sticky top-0 border-b border-slate-200">
             <div class="flex items-center justify-between mb-1">
@@ -79,10 +56,7 @@
                     </button>
                 </div>
             </div>
-            <div class="flex items-center justify-between">
-                <p id="date-label" class="text-xs font-medium text-slate-400">Loading...</p>
-                <p id="user-id-display" class="text-[9px] text-slate-300 font-mono"></p>
-            </div>
+            <p id="date-label" class="text-xs font-medium text-slate-400">Loading...</p>
         </header>
 
         <main id="content-area" class="flex-1 overflow-y-auto pb-32 bg-slate-50">
@@ -122,7 +96,10 @@
     <!-- Modal -->
     <div id="task-modal" class="fixed inset-0 bg-slate-900/40 hidden items-end sm:items-center justify-center z-50 p-0 sm:p-4 backdrop-blur-sm">
         <div class="bg-white rounded-t-[2.5rem] sm:rounded-[2rem] w-full max-w-md p-8 shadow-2xl">
-            <h3 id="modal-title" class="text-xl font-bold mb-8">作業の追加</h3>
+            <div class="flex items-center justify-between mb-8">
+                <h3 id="modal-title" class="text-xl font-bold">作業の追加</h3>
+                <button id="delete-task-btn" onclick="deleteTask()" class="delete-btn hidden">削除</button>
+            </div>
             <form id="task-form" class="space-y-5">
                 <input type="hidden" id="edit-task-id">
                 <div class="space-y-2">
@@ -163,10 +140,7 @@
         </div>
     </div>
 
-    <script type="module">
-        import { doc, setDoc, onSnapshot, collection, query, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
+    <script>
         const statusMap = {
             'todo': { label: '未対応', class: 'status-todo' },
             'doing': { label: '対応中', class: 'status-doing' },
@@ -174,45 +148,22 @@
             'waiting': { label: '保留', class: 'status-waiting' }
         };
 
-        window.tasks = [];
-        window.user = null;
+        let tasks = [];
         let selectedDate = new Date().toISOString().split('T')[0];
         let currentView = 'list';
 
-        async function initAuth() {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(window.auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(window.auth);
-                }
-            } catch (error) {
-                console.error("Auth error:", error);
-            }
+        // --- localStorage でデータ保存 ---
+        function loadTasks() {
+            const data = localStorage.getItem('client-manager-tasks');
+            tasks = data ? JSON.parse(data) : [];
         }
 
-        onAuthStateChanged(window.auth, (u) => {
-            window.user = u;
-            if (u) {
-                document.getElementById('user-id-display').innerText = `ID: ${u.uid}`;
-                syncData();
-            }
-        });
-
-        function syncData() {
-            if (!window.user) return;
-            const tasksRef = collection(window.db, 'artifacts', window.appId, 'users', window.user.uid, 'tasks');
-            
-            onSnapshot(tasksRef, (snapshot) => {
-                window.tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                document.getElementById('loading').classList.add('hidden');
-                renderAll();
-            }, (error) => {
-                console.error("Sync error:", error);
-            });
+        function saveTasks() {
+            localStorage.setItem('client-manager-tasks', JSON.stringify(tasks));
         }
 
-        window.renderAll = function() {
+        // --- 描画 ---
+        function renderAll() {
             renderSummary();
             renderProjectList();
             updateFormHelpers();
@@ -221,7 +172,7 @@
                 renderCalendarDetail();
             }
             lucide.createIcons();
-        };
+        }
 
         function createTaskCard(t) {
             const item = document.createElement('div');
@@ -231,7 +182,7 @@
                 <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="toggleTask('${t.id}')" class="custom-checkbox">
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
-                        <p class="text-sm font-bold text-slate-700 truncate cursor-pointer" onclick="openEditModal('${t.id}')">${t.title}</p>
+                        <p class="text-sm font-bold text-slate-700 truncate cursor-pointer task-title-text" onclick="openEditModal('${t.id}')">${t.title}</p>
                         ${!t.completed ? `<span class="status-tag shrink-0 ${status.class}">${status.label}</span>` : ''}
                     </div>
                     <div class="flex items-center gap-2 mt-1">
@@ -249,18 +200,22 @@
             const todayStr = new Date().toISOString().split('T')[0];
             const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
             const tomorrowStr = tomorrow.toISOString().split('T')[0];
-            const recent = window.tasks.filter(t => t.date && (t.date === todayStr || t.date === tomorrowStr)).sort((a,b) => a.completed - b.completed);
-            if (recent.length === 0) { container.innerHTML = '<p class="text-slate-300 text-sm py-2">直近の予定はありません</p>'; return; }
+            const recent = tasks.filter(t => t.date && (t.date === todayStr || t.date === tomorrowStr)).sort((a, b) => a.completed - b.completed);
+            if (recent.length === 0) {
+                container.innerHTML = '<p class="text-slate-300 text-sm py-2">直近の予定はありません</p>';
+                return;
+            }
             recent.forEach(t => container.appendChild(createTaskCard(t)));
         }
 
         function renderProjectList() {
             const container = document.getElementById('project-container');
             container.innerHTML = '';
-            const clients = [...new Set(window.tasks.map(t => t.clientName))];
+            const clients = [...new Set(tasks.map(t => t.clientName))];
             clients.forEach(clientName => {
                 const clientSection = document.createElement('div');
                 clientSection.className = "mb-6";
+                const safeId = clientName.replace(/[^a-zA-Z0-9]/g, '_');
                 clientSection.innerHTML = `
                     <div class="flex items-center gap-3 mb-4">
                         <div class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm"><i data-lucide="user-round" class="w-4 h-4"></i></div>
@@ -268,19 +223,22 @@
                     </div>
                     <div class="relative ml-2">
                         <div class="hierarchy-line"></div>
-                        <div id="client-tasks-${clientName.replace(/\s+/g, '')}" class="space-y-3"></div>
+                        <div id="client-tasks-${safeId}" class="space-y-3"></div>
                     </div>
                 `;
                 container.appendChild(clientSection);
-                const taskContainer = document.getElementById(`client-tasks-${clientName.replace(/\s+/g, '')}`);
-                const parentTasks = window.tasks.filter(t => t.clientName === clientName && !t.parentId);
+                const taskContainer = document.getElementById(`client-tasks-${safeId}`);
+                const parentTasks = tasks.filter(t => t.clientName === clientName && !t.parentId);
                 parentTasks.forEach(pt => {
                     const ptNode = document.createElement('div');
                     ptNode.appendChild(createTaskCard(pt));
-                    const subContainer = document.createElement('div');
-                    subContainer.className = "subtask-node space-y-2 mt-2";
-                    window.tasks.filter(t => t.parentId === pt.id).forEach(st => subContainer.appendChild(createTaskCard(st)));
-                    ptNode.appendChild(subContainer);
+                    const subTasks = tasks.filter(t => t.parentId === pt.id);
+                    if (subTasks.length > 0) {
+                        const subContainer = document.createElement('div');
+                        subContainer.className = "subtask-node space-y-2 mt-2";
+                        subTasks.forEach(st => subContainer.appendChild(createTaskCard(st)));
+                        ptNode.appendChild(subContainer);
+                    }
                     taskContainer.appendChild(ptNode);
                 });
             });
@@ -300,15 +258,15 @@
                     const h = document.createElement('div'); h.className = 'text-[10px] font-bold text-slate-300 text-center pb-2'; h.innerText = d; grid.appendChild(h);
                 });
                 const startDay = (new Date(monthDate.getFullYear(), monthDate.getMonth(), 1).getDay() + 6) % 7;
-                for(let s=0; s<startDay; s++) grid.appendChild(document.createElement('div'));
+                for (let s = 0; s < startDay; s++) grid.appendChild(document.createElement('div'));
                 const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
                 for (let d = 1; d <= daysInMonth; d++) {
-                    const dateStr = `${monthDate.getFullYear()}-${String(monthDate.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                    const dayTasks = window.tasks.filter(t => t.date === dateStr);
+                    const dateStr = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    const dayTasks = tasks.filter(t => t.date === dateStr);
                     const cell = document.createElement('div');
                     cell.className = `min-h-[60px] p-1 flex flex-col items-center rounded-lg cursor-pointer transition-all ${selectedDate === dateStr ? 'calendar-day-active' : 'hover:bg-slate-50'}`;
-                    cell.onclick = () => { selectedDate = dateStr; window.renderAll(); };
-                    cell.innerHTML = `<span class="text-[10px] font-bold mb-1 ${dayTasks.some(t=>!t.completed) ? 'text-slate-900' : 'text-slate-300'}">${d}</span>`;
+                    cell.onclick = () => { selectedDate = dateStr; renderAll(); };
+                    cell.innerHTML = `<span class="text-[10px] font-bold mb-1 ${dayTasks.some(t => !t.completed) ? 'text-slate-900' : 'text-slate-300'}">${d}</span>`;
                     dayTasks.slice(0, 2).forEach(t => {
                         const label = document.createElement('span');
                         label.className = `calendar-task-label ${t.completed ? 'opacity-40 line-through bg-slate-100' : 'bg-slate-900 text-white font-medium'}`;
@@ -325,26 +283,30 @@
             const label = document.getElementById('calendar-detail-label');
             const badge = document.getElementById('task-count-badge');
             list.innerHTML = '';
-            const dayTasks = window.tasks.filter(t => t.date === selectedDate).sort((a, b) => a.completed - b.completed);
+            const dayTasks = tasks.filter(t => t.date === selectedDate).sort((a, b) => a.completed - b.completed);
             const d = new Date(selectedDate);
-            label.innerText = `${d.getMonth()+1}月${d.getDate()}日の予定`;
+            label.innerText = `${d.getMonth() + 1}月${d.getDate()}日の予定`;
             if (dayTasks.length > 0) {
                 badge.innerText = `${dayTasks.length}件`; badge.classList.remove('hidden');
                 dayTasks.forEach(t => list.appendChild(createTaskCard(t)));
-            } else { badge.classList.add('hidden'); list.innerHTML = '<p class="text-slate-300 text-xs text-center py-8">この日の予定はありません</p>'; }
+            } else {
+                badge.classList.add('hidden');
+                list.innerHTML = '<p class="text-slate-300 text-xs text-center py-8">この日の予定はありません</p>';
+            }
         }
 
-        window.toggleTask = async function(id) {
-            if (!window.user) return;
-            const t = window.tasks.find(x => x.id === id);
+        // --- 操作 ---
+        function toggleTask(id) {
+            const t = tasks.find(x => x.id === id);
             if (t) {
-                const taskRef = doc(window.db, 'artifacts', window.appId, 'users', window.user.uid, 'tasks', id);
-                await setDoc(taskRef, { completed: !t.completed }, { merge: true });
+                t.completed = !t.completed;
+                saveTasks();
+                renderAll();
             }
-        };
+        }
 
-        window.openEditModal = function(id) {
-            const t = window.tasks.find(x => x.id === id);
+        function openEditModal(id) {
+            const t = tasks.find(x => x.id === id);
             if (!t) return;
             document.getElementById('modal-title').innerText = "作業の編集";
             document.getElementById('edit-task-id').value = t.id;
@@ -353,29 +315,46 @@
             document.getElementById('task-date').value = t.date;
             document.getElementById('parent-id').value = t.parentId || "";
             document.getElementById('task-status').value = t.status;
+            document.getElementById('delete-task-btn').classList.remove('hidden');
             document.getElementById('task-modal').classList.replace('hidden', 'flex');
             updateFormHelpers();
-        };
+        }
 
-        document.getElementById('task-form').onsubmit = async (e) => {
+        function deleteTask() {
+            const id = document.getElementById('edit-task-id').value;
+            if (!id) return;
+            if (confirm('この作業を削除しますか？')) {
+                tasks = tasks.filter(t => t.id !== id && t.parentId !== id);
+                saveTasks();
+                closeModal();
+                renderAll();
+            }
+        }
+
+        document.getElementById('task-form').onsubmit = (e) => {
             e.preventDefault();
-            if (!window.user) return;
             const id = document.getElementById('edit-task-id').value || Date.now().toString();
+            const existing = tasks.find(t => t.id === id);
             const data = {
+                id: id,
                 clientName: document.getElementById('client-name').value || "未分類",
                 title: document.getElementById('task-title').value,
                 date: document.getElementById('task-date').value,
                 parentId: document.getElementById('parent-id').value || null,
                 status: document.getElementById('task-status').value,
-                completed: false,
-                updatedAt: new Date().toISOString()
+                completed: existing ? existing.completed : false
             };
-            const taskRef = doc(window.db, 'artifacts', window.appId, 'users', window.user.uid, 'tasks', id);
-            await setDoc(taskRef, data, { merge: true });
+            if (existing) {
+                Object.assign(existing, data);
+            } else {
+                tasks.push(data);
+            }
+            saveTasks();
             closeModal();
+            renderAll();
         };
 
-        window.switchView = function(view) {
+        function switchView(view) {
             currentView = view;
             const isList = view === 'list';
             document.getElementById('list-view').classList.toggle('hidden', !isList);
@@ -383,43 +362,43 @@
             document.getElementById('view-title').innerText = isList ? 'Workspace' : 'Calendar';
             document.getElementById('btn-list').className = isList ? 'p-2 rounded-xl bg-slate-900 text-white shadow-md' : 'p-2 rounded-xl text-slate-400';
             document.getElementById('btn-calendar').className = !isList ? 'p-2 rounded-xl bg-slate-900 text-white shadow-md' : 'p-2 rounded-xl text-slate-400';
-            window.renderAll();
-        };
+            renderAll();
+        }
 
-        window.updateFormHelpers = function() {
+        function updateFormHelpers() {
             const clientList = document.getElementById('client-list');
-            const uniqueClients = [...new Set(window.tasks.map(t => t.clientName))];
+            const uniqueClients = [...new Set(tasks.map(t => t.clientName))];
             clientList.innerHTML = uniqueClients.map(c => `<option value="${c}">`).join('');
             const parentSelect = document.getElementById('parent-id');
             const currentVal = parentSelect.value;
             const editingId = document.getElementById('edit-task-id').value;
             parentSelect.innerHTML = '<option value="">(なし: 親作業として登録)</option>';
-            window.tasks.filter(t => !t.parentId && t.id !== editingId).forEach(t => {
+            tasks.filter(t => !t.parentId && t.id !== editingId).forEach(t => {
                 parentSelect.innerHTML += `<option value="${t.id}">${t.clientName}: ${t.title}</option>`;
             });
             parentSelect.value = currentVal;
-        };
+        }
 
-        window.updateHeaderDate = function() {
-            const options = { month: 'long', day: 'numeric', weekday: 'long' };
-            document.getElementById('date-label').innerText = "今日: " + new Date().toLocaleDateString('ja-JP', options);
-        };
-
-        window.openModal = function() {
+        function openModal() {
             document.getElementById('modal-title').innerText = "作業の追加";
             document.getElementById('edit-task-id').value = "";
             document.getElementById('task-form').reset();
             document.getElementById('task-date').value = selectedDate;
+            document.getElementById('delete-task-btn').classList.add('hidden');
             document.getElementById('task-modal').classList.replace('hidden', 'flex');
             updateFormHelpers();
-        };
+        }
 
-        window.closeModal = function() { document.getElementById('task-modal').classList.replace('flex', 'hidden'); };
+        function closeModal() {
+            document.getElementById('task-modal').classList.replace('flex', 'hidden');
+        }
 
+        // --- 起動 ---
         window.onload = () => {
-            initAuth();
-            window.updateHeaderDate();
-            lucide.createIcons();
+            loadTasks();
+            const options = { month: 'long', day: 'numeric', weekday: 'long' };
+            document.getElementById('date-label').innerText = "今日: " + new Date().toLocaleDateString('ja-JP', options);
+            renderAll();
         };
     </script>
 </body>
