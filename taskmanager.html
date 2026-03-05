@@ -40,8 +40,8 @@
     .hide-completed .task-completed{display:none}
     .toggle-all-btn{font-size:11px;color:#64748b;background:#f1f5f9;border:1px solid #e2e8f0;padding:3px 10px;border-radius:6px;cursor:pointer;font-weight:600}
     .toggle-all-btn:hover{background:#e2e8f0}
-    .board-scroll{display:flex;gap:1rem;overflow-x:auto;padding-bottom:1rem;scroll-snap-type:x mandatory}
-    .board-card{background:#fff;border:1px solid #e2e8f0;border-radius:1rem;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;scroll-snap-align:start}
+    .board-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;padding-bottom:1rem}
+    .board-card{background:#fff;border:1px solid #e2e8f0;border-radius:1rem;display:flex;flex-direction:column;overflow:hidden}
     .board-card-header{padding:.75rem 1rem;border-bottom:1px solid #e2e8f0;font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:space-between;border-radius:1rem 1rem 0 0}
     .board-card-body{padding:.75rem;flex:1;overflow-y:auto;max-height:60vh}
     .board-card-body .task-panel{margin-bottom:.5rem}
@@ -51,7 +51,7 @@
     .accordion-header:hover{filter:brightness(.95)}
     .accordion-body{max-height:0;overflow:hidden;transition:max-height .3s ease}
     .accordion-body.open{max-height:9999px}
-    .calendar-day{min-height:70px;padding:4px;display:flex;flex-direction:column;align-items:center;border-radius:.5najbolj;cursor:pointer;transition:all .15s}
+    .calendar-day{min-height:70px;padding:4px;display:flex;flex-direction:column;align-items:center;border-radius:.5rem;cursor:pointer;transition:all .15s}
     .calendar-day:hover{background:#f8fafc}
     .calendar-day.selected{background:#f8fafc;box-shadow:inset 0 0 0 2px #0f172a}
     .calendar-day.today{background:#eff6ff}
@@ -59,6 +59,9 @@
     .calendar-day.saturday .day-number{color:#3b82f6}
     .calendar-task-dot{width:5px;height:5px;border-radius:50%;margin-top:2px}
     .child-modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.4);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+    .summary-grid{display:grid;grid-template-columns:1fr;gap:.5rem}
+    @media(min-width:640px){.summary-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(min-width:1024px){.summary-grid{grid-template-columns:repeat(3,1fr)}}
   </style>
 </head>
 <body class="text-slate-800">
@@ -100,7 +103,7 @@
       <div id="list-view" class="p-4 sm:p-6 space-y-8 max-w-3xl mx-auto">
         <section>
           <div class="flex items-center gap-2 mb-4"><span class="w-1.5 h-6 bg-amber-400 rounded-full"></span><h2 class="font-bold text-base">今日・明日の予定</h2></div>
-          <div id="summary-container" class="space-y-2"></div>
+          <div id="summary-container" class="summary-grid"></div>
         </section>
         <section>
           <div class="flex items-center justify-between mb-4">
@@ -111,11 +114,11 @@
         </section>
       </div>
       <div id="board-view" class="hidden p-4 sm:p-6">
-        <section class="mb-6 max-w-3xl">
+        <section class="mb-6">
           <div class="flex items-center gap-2 mb-4"><span class="w-1.5 h-6 bg-amber-400 rounded-full"></span><h2 class="font-bold text-base">今日・明日の予定</h2></div>
-          <div id="board-summary-container" class="space-y-2"></div>
+          <div id="board-summary-container" class="summary-grid"></div>
         </section>
-        <div id="board-container" class="board-scroll"></div>
+        <div id="board-container" class="board-grid"></div>
       </div>
       <div id="calendar-view" class="hidden">
         <div class="p-4 max-w-3xl mx-auto">
@@ -299,7 +302,7 @@ function createTaskCard(t){
   var div=document.createElement('div');
   div.className='task-panel'+(isCompleted?' task-completed':'');
   var titleText=t.title||'（タスクなし）';
-  var uid='t'+hashStr(t.id+Math.random());
+  var uid='t'+hashStr(t.id+''+Math.random());
 
   div.innerHTML='<div class="flex items-start gap-3">'
     +'<input type="checkbox" class="custom-checkbox mt-0.5" id="'+uid+'" '+(isCompleted?'checked':'')+'>'
@@ -394,15 +397,12 @@ function renderBoard(){
   var clients=getOrderedClients();
   var count=clients.length;
   if(count===0)return;
-  var screenW=window.innerWidth;
-  var cardWidth;
-  if(screenW<768){cardWidth='85vw'}
-  else{var available=screenW-48-(count-1)*16;cardWidth=Math.max(240,Math.floor(available/count))+'px'}
 
   clients.forEach(function(name,idx){
     var color=getClientColor(name);
     var clientTasks=tasks.filter(function(t){return t.clientName===name});
-    var card=document.createElement('div');card.className='board-card';card.style.width=cardWidth;card.style.minWidth=screenW<768?'85vw':cardWidth;
+    var card=document.createElement('div');card.className='board-card';
+
     var header=document.createElement('div');header.className='board-card-header';header.style.backgroundColor=color.bg;header.style.color=color.text;
 
     var headerLeft=document.createElement('div');headerLeft.className='flex items-center gap-2';
@@ -640,4 +640,3 @@ window.onload=function(){
 </script>
 </body>
 </html>
-
