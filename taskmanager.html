@@ -41,6 +41,9 @@
         .delete-btn { font-size: 10px; color: #ef4444; background: #fef2f2; border: 1px solid #fee2e2; padding: 2px 8px; border-radius: 8px; cursor: pointer; }
         .delete-btn:active { background: #fee2e2; }
         .loading-overlay { position: fixed; inset: 0; background: white; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .swipe-container { position: relative; overflow: hidden; }
+        .swipe-content { position: relative; z-index: 1; background: white; transition: transform 0.2s; }
+        .swipe-delete-bg { position: absolute; right: 0; top: 0; bottom: 0; width: 80px; background: #ef4444; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: 700; border-radius: 0 1rem 1rem 0; }
     </style>
 </head>
 <body class="text-slate-800">
@@ -110,12 +113,12 @@
                 <input type="hidden" id="edit-task-id">
                 <div class="space-y-2">
                     <label class="text-xs font-bold text-slate-400 uppercase">クライアント名</label>
-                    <input type="text" id="client-name" list="client-list" placeholder="新規入力または選択" class="w-full px-5 py-4 bg-slate-50 rounded-2xl outline-none border-none">
+                    <input type="text" id="client-name" list="client-list" required placeholder="新規入力または選択" class="w-full px-5 py-4 bg-slate-50 rounded-2xl outline-none border-none">
                     <datalist id="client-list"></datalist>
                 </div>
                 <div class="space-y-2">
                     <label class="text-xs font-bold text-slate-400 uppercase">作業内容（タイトル）</label>
-                    <input type="text" id="task-title" placeholder="具体的な作業名" class="w-full px-5 py-4 bg-slate-50 rounded-2xl outline-none border-none text-lg">
+                    <input type="text" id="task-title" placeholder="具体的な作業名（空欄可）" class="w-full px-5 py-4 bg-slate-50 rounded-2xl outline-none border-none text-lg">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-2">
@@ -211,21 +214,72 @@
         function createTaskCard(t) {
             const item = document.createElement('div');
             const status = statusMap[t.status || 'todo'];
-            item.className = `task-panel p-4 rounded-2xl flex items-center gap-4 ${t.completed ? 'task-completed' : ''}`;
+            item.className = 'swipe-container rounded-2xl';
             item.innerHTML = `
-                <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="toggleTask('${t.id}')" class="custom-checkbox">
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2">
-                        <p class="text-sm font-bold text-slate-700 truncate cursor-pointer task-title-text" onclick="openEditModal('${t.id}')">${t.title}</p>
-                        ${!t.completed ? `<span class="status-tag shrink-0 ${status.class}">${status.label}</span>` : ''}
-                    </div>
-                    <div class="flex items-center gap-2 mt-1">
-                        <span class="text-[10px] text-slate-400 font-medium">${t.clientName}</span>
-                        ${t.date ? `<span class="date-badge">${t.date.split('-').slice(1).join('/')}</span>` : ''}
+                <div class="swipe-delete-bg">削除</div>
+                <div class="swipe-content task-panel p-4 rounded-2xl flex items-center gap-4 ${t.completed ? 'task-completed' : ''}">
+                    <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="toggleTask('${t.id}')" class="custom-checkbox">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <p class="text-sm font-bold text-slate-700 truncate cursor-pointer task-title-text" onclick="openEditModal('${t.id}')">${t.title}</p>
+                            ${!t.completed ? `<span class="status-tag shrink-0 ${status.class}">${status.label}</span>` : ''}
+                        </div>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-[10px] text-slate-400 font-medium">${t.clientName}</span>
+                            ${t.date ? `<span class="date-badge">${t.date.split('-').slice(1).join('/')}</span>` : ''}
+                        </div>
                     </div>
                 </div>
             `;
+            // スワイプ削除の設定
+            setupSwipe(item, t.id);
             return item;
+        }
+
+        function setupSwipe(container, taskId) {
+            let startX = 0;
+            let currentX = 0;
+            let isDragging = false;
+            const content = container.querySelector('.swipe-content');
+            const threshold = -70;
+
+            content.addEventListener('touchstart', (e) => {
+                startX = e.touches[0].clientX;
+                isDragging = true;
+                content.style.transition = 'none';
+            });
+
+            content.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                currentX = e.touches[0].clientX - startX;
+                if (currentX < 0) {
+                    content.style.transform = `translateX(${Math.max(currentX, -80)}px)`;
+                }
+            });
+
+            content.addEventListener('touchend', () => {
+                isDragging = false;
+                content.style.transition = 'transform 0.2s';
+                if (currentX < threshold) {
+                    content.style.transform = 'translateX(-80px)';
+                    // 削除ボタンエリアをタップで削除
+                    container.querySelector('.swipe-delete-bg').onclick = () => {
+                        if (confirm('この作業を削除しますか？')) {
+                            deleteTaskFromServer(taskId);
+                        }
+                    };
+                } else {
+                    content.style.transform = 'translateX(0)';
+                }
+                currentX = 0;
+            });
+
+            // PC用：右クリックメニューの代わりにダブルクリックで削除
+            content.addEventListener('dblclick', () => {
+                if (confirm('この作業を削除しますか？')) {
+                    deleteTaskFromServer(taskId);
+                }
+            });
         }
 
         function renderSummary() {
@@ -234,7 +288,7 @@
             const todayStr = new Date().toISOString().split('T')[0];
             const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
             const tomorrowStr = tomorrow.toISOString().split('T')[0];
-            const recent = tasks.filter(t => t.date && (t.date === todayStr || t.date === tomorrowStr)).sort((a, b) => a.completed - b.completed);
+            const recent = tasks.filter(t => t.title && t.date && (t.date === todayStr || t.date === tomorrowStr)).sort((a, b) => a.completed - b.completed);
             if (recent.length === 0) {
                 container.innerHTML = '<p class="text-slate-300 text-sm py-2">直近の予定はありません</p>';
                 return;
@@ -254,31 +308,43 @@
                 const clientSection = document.createElement('div');
                 clientSection.className = "mb-6";
                 const safeId = clientName.replace(/[^a-zA-Z0-9]/g, '_');
+                const clientTasks = tasks.filter(t => t.clientName === clientName && t.title);
+                const clientOnlyEntries = tasks.filter(t => t.clientName === clientName && !t.title);
+
                 clientSection.innerHTML = `
                     <div class="flex items-center gap-3 mb-4">
                         <div class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm"><i data-lucide="user-round" class="w-4 h-4"></i></div>
                         <h3 class="font-bold text-slate-900 text-sm">${clientName}</h3>
-                    </div>
-                    <div class="relative ml-2">
-                        <div class="hierarchy-line"></div>
-                        <div id="client-tasks-${safeId}" class="space-y-3"></div>
+                        ${clientOnlyEntries.length > 0 && clientTasks.length === 0 ? '<span class="text-[10px] text-slate-300">タスクなし</span>' : ''}
                     </div>
                 `;
+
+                if (clientTasks.length > 0) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = "relative ml-2";
+                    wrapper.innerHTML = '<div class="hierarchy-line"></div>';
+                    const taskContainer = document.createElement('div');
+                    taskContainer.className = "space-y-3";
+
+                    const parentTasks = clientTasks.filter(t => !t.parentId);
+                    parentTasks.forEach(pt => {
+                        const ptNode = document.createElement('div');
+                        ptNode.appendChild(createTaskCard(pt));
+                        const subTasks = clientTasks.filter(t => t.parentId === pt.id);
+                        if (subTasks.length > 0) {
+                            const subContainer = document.createElement('div');
+                            subContainer.className = "subtask-node space-y-2 mt-2";
+                            subTasks.forEach(st => subContainer.appendChild(createTaskCard(st)));
+                            ptNode.appendChild(subContainer);
+                        }
+                        taskContainer.appendChild(ptNode);
+                    });
+
+                    wrapper.appendChild(taskContainer);
+                    clientSection.appendChild(wrapper);
+                }
+
                 container.appendChild(clientSection);
-                const taskContainer = document.getElementById(`client-tasks-${safeId}`);
-                const parentTasks = tasks.filter(t => t.clientName === clientName && !t.parentId);
-                parentTasks.forEach(pt => {
-                    const ptNode = document.createElement('div');
-                    ptNode.appendChild(createTaskCard(pt));
-                    const subTasks = tasks.filter(t => t.parentId === pt.id);
-                    if (subTasks.length > 0) {
-                        const subContainer = document.createElement('div');
-                        subContainer.className = "subtask-node space-y-2 mt-2";
-                        subTasks.forEach(st => subContainer.appendChild(createTaskCard(st)));
-                        ptNode.appendChild(subContainer);
-                    }
-                    taskContainer.appendChild(ptNode);
-                });
             });
         }
 
@@ -300,7 +366,7 @@
                 const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
                 for (let d = 1; d <= daysInMonth; d++) {
                     const dateStr = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                    const dayTasks = tasks.filter(t => t.date === dateStr);
+                    const dayTasks = tasks.filter(t => t.date === dateStr && t.title);
                     const cell = document.createElement('div');
                     cell.className = `min-h-[60px] p-1 flex flex-col items-center rounded-lg cursor-pointer transition-all ${selectedDate === dateStr ? 'calendar-day-active' : 'hover:bg-slate-50'}`;
                     cell.onclick = () => { selectedDate = dateStr; renderAll(); };
@@ -321,7 +387,7 @@
             const label = document.getElementById('calendar-detail-label');
             const badge = document.getElementById('task-count-badge');
             list.innerHTML = '';
-            const dayTasks = tasks.filter(t => t.date === selectedDate).sort((a, b) => a.completed - b.completed);
+            const dayTasks = tasks.filter(t => t.date === selectedDate && t.title).sort((a, b) => a.completed - b.completed);
             const d = new Date(selectedDate);
             label.innerText = `${d.getMonth() + 1}月${d.getDate()}日の予定`;
             if (dayTasks.length > 0) {
@@ -342,7 +408,7 @@
                 await saveTaskToServer({
                     id: t.id,
                     clientName: t.clientName,
-                    title: t.title,
+                    title: t.title || '',
                     date: t.date || '',
                     parentId: t.parentId || '',
                     status: t.status,
@@ -357,7 +423,7 @@
             document.getElementById('modal-title').innerText = "作業の編集";
             document.getElementById('edit-task-id').value = t.id;
             document.getElementById('client-name').value = t.clientName;
-            document.getElementById('task-title').value = t.title;
+            document.getElementById('task-title').value = t.title || '';
             document.getElementById('task-date').value = t.date || '';
             document.getElementById('parent-id').value = t.parentId || "";
             document.getElementById('task-status').value = t.status;
@@ -411,7 +477,7 @@
             const currentVal = parentSelect.value;
             const editingId = document.getElementById('edit-task-id').value;
             parentSelect.innerHTML = '<option value="">(なし: 親作業として登録)</option>';
-            tasks.filter(t => !t.parentId && t.id !== editingId).forEach(t => {
+            tasks.filter(t => t.title && !t.parentId && t.id !== editingId).forEach(t => {
                 parentSelect.innerHTML += `<option value="${t.id}">${t.clientName}: ${t.title}</option>`;
             });
             parentSelect.value = currentVal;
@@ -440,4 +506,3 @@
     </script>
 </body>
 </html>
-
