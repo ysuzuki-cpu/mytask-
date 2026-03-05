@@ -47,17 +47,17 @@
         .calendar-day.sunday .day-number { color: #ef4444; }
         .calendar-day.saturday .day-number { color: #3b82f6; }
         .calendar-task-dot { width: 5px; height: 5px; border-radius: 50%; margin-top: 2px; }
-        .board-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 1rem; min-width: 280px; max-width: 350px; flex-shrink: 0; display: flex; flex-direction: column; max-height: calc(100vh - 220px); }
-        .board-card-header { padding: 1rem 1.25rem; border-bottom: 1px solid #e2e8f0; font-weight: 700; font-size: 0.9rem; background: white; border-radius: 1rem 1rem 0 0; position: sticky; top: 0; }
-        .board-card-body { padding: 0.75rem; overflow-y: auto; flex: 1; }
+        .board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        .board-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 1rem; display: flex; flex-direction: column; }
+        .board-card-header { padding: 1rem 1.25rem; border-bottom: 1px solid #e2e8f0; font-weight: 700; font-size: 0.9rem; background: white; border-radius: 1rem 1rem 0 0; }
+        .board-card-body { padding: 0.75rem; flex: 1; }
         .view-toggle { display: flex; background: #f1f5f9; border-radius: 0.75rem; padding: 3px; }
         .view-toggle button { padding: 0.4rem 0.75rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer; background: transparent; color: #94a3b8; transition: all 0.2s; }
         .view-toggle button.active { background: white; color: #0f172a; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .hide-completed .task-completed { display: none; }
         .login-screen { position: fixed; inset: 0; background: white; z-index: 300; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; }
-        @media (max-width: 768px) {
-            .board-card { min-width: 100%; max-width: 100%; max-height: none; }
-        }
+        .toggle-all-btn { font-size: 11px; color: #64748b; background: #f1f5f9; border: 1px solid #e2e8f0; padding: 3px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        .toggle-all-btn:hover { background: #e2e8f0; }
     </style>
 </head>
 <body class="text-slate-800">
@@ -125,9 +125,12 @@
                     <div id="summary-container" class="space-y-2"></div>
                 </section>
                 <section>
-                    <div class="flex items-center gap-2 mb-4">
-                        <span class="w-1.5 h-6 bg-slate-300 rounded-full"></span>
-                        <h2 class="font-bold text-base">クライアント別タスク</h2>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-6 bg-slate-300 rounded-full"></span>
+                            <h2 class="font-bold text-base">クライアント別タスク</h2>
+                        </div>
+                        <button id="toggle-all-accordion" onclick="toggleAllAccordions()" class="toggle-all-btn">すべて開く</button>
                     </div>
                     <div id="project-container" class="space-y-4"></div>
                 </section>
@@ -141,7 +144,7 @@
                     </div>
                     <div id="board-summary-container" class="space-y-2"></div>
                 </section>
-                <div id="board-container" class="flex gap-4 overflow-x-auto pb-4"></div>
+                <div id="board-container" class="board-grid"></div>
             </div>
             <!-- Calendar view -->
             <div id="calendar-view" class="hidden">
@@ -247,7 +250,6 @@
             'waiting': { label: '保留', class: 'status-waiting', next: 'todo' }
         };
 
-        // Japanese holidays (2026)
         const holidays2026 = {
             '2026-01-01': '元日', '2026-01-12': '成人の日', '2026-02-11': '建国記念の日',
             '2026-02-23': '天皇誕生日', '2026-03-20': '春分の日', '2026-04-29': '昭和の日',
@@ -280,6 +282,7 @@
         let pendingDeleteId = null;
         let isOnline = navigator.onLine;
         let isSaving = false;
+        let allAccordionsOpen = false;
 
         // --- Auth ---
         function doLogin() {
@@ -289,21 +292,11 @@
             document.getElementById('loading').classList.remove('hidden');
             fetchTasks();
         }
-
-        document.getElementById('password-input').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') doLogin();
-        });
+        document.getElementById('password-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
 
         // --- Network ---
-        window.addEventListener('online', () => {
-            isOnline = true;
-            document.getElementById('offline-badge').classList.add('hidden');
-            fetchTasks();
-        });
-        window.addEventListener('offline', () => {
-            isOnline = false;
-            document.getElementById('offline-badge').classList.remove('hidden');
-        });
+        window.addEventListener('online', () => { isOnline = true; document.getElementById('offline-badge').classList.add('hidden'); fetchTasks(); });
+        window.addEventListener('offline', () => { isOnline = false; document.getElementById('offline-badge').classList.remove('hidden'); });
 
         // --- Toast ---
         function showToast(msg, type) {
@@ -312,20 +305,9 @@
             t.className = `toast ${type === 'error' ? 'toast-error' : 'toast-success'} show`;
             setTimeout(() => t.classList.remove('show'), 2000);
         }
-
-        function showError(msg) {
-            document.getElementById('error-msg').textContent = msg;
-            document.getElementById('error-bar').classList.remove('hidden');
-        }
-
-        function hideError() {
-            document.getElementById('error-bar').classList.add('hidden');
-        }
-
-        function retryFetch() {
-            hideError();
-            fetchTasks();
-        }
+        function showError(msg) { document.getElementById('error-msg').textContent = msg; document.getElementById('error-bar').classList.remove('hidden'); }
+        function hideError() { document.getElementById('error-bar').classList.add('hidden'); }
+        function retryFetch() { hideError(); fetchTasks(); }
 
         // --- API ---
         async function fetchTasks() {
@@ -337,12 +319,9 @@
                     document.getElementById('app').classList.remove('hidden');
                     renderAll();
                 }
-
                 if (!isOnline) return;
-
                 const res = await fetch(API_URL + '?action=getAll&password=' + encodeURIComponent(password));
                 const data = await res.json();
-
                 if (data.error === 'Unauthorized') {
                     document.getElementById('loading').classList.add('hidden');
                     document.getElementById('app').classList.add('hidden');
@@ -351,7 +330,6 @@
                     localStorage.removeItem('tasks-cache');
                     return;
                 }
-
                 tasks = data;
                 localStorage.setItem('tasks-cache', JSON.stringify(tasks));
                 document.getElementById('loading').classList.add('hidden');
@@ -359,7 +337,6 @@
                 hideError();
                 renderAll();
             } catch (e) {
-                console.error('Fetch error:', e);
                 const cache = localStorage.getItem('tasks-cache');
                 if (cache && tasks.length === 0) {
                     tasks = JSON.parse(cache);
@@ -378,8 +355,7 @@
             document.getElementById('submit-btn').disabled = true;
             try {
                 params.password = password;
-                const body = new URLSearchParams(params);
-                await fetch(API_URL, { method: 'POST', body: body });
+                await fetch(API_URL, { method: 'POST', body: new URLSearchParams(params) });
                 showToast('保存しました', 'success');
                 await fetchTasks();
             } catch (e) {
@@ -397,9 +373,7 @@
                 await fetch(API_URL, { method: 'POST', body: new URLSearchParams({ action: 'delete', id: id, password: password }) });
                 showToast('削除しました', 'success');
                 await fetchTasks();
-            } catch (e) {
-                showToast('削除に失敗しました', 'error');
-            }
+            } catch (e) { showToast('削除に失敗しました', 'error'); }
         }
 
         // --- Render ---
@@ -408,31 +382,22 @@
             renderProjectList();
             renderBoard();
             updateFormHelpers();
-            if (currentView === 'calendar') {
-                renderCalendar();
-                renderCalendarDetail();
-            }
+            if (currentView === 'calendar') { renderCalendar(); renderCalendarDetail(); }
             lucide.createIcons();
         }
 
-        function getActiveTasks() {
-            return tasks.filter(t => t.title);
-        }
+        function getActiveTasks() { return tasks.filter(t => t.title); }
 
         function createTaskCard(t, compact) {
             const item = document.createElement('div');
             const status = statusMap[t.status || 'todo'];
             item.className = `task-panel p-3 flex items-start gap-3 ${t.completed ? 'task-completed' : ''}`;
             item.setAttribute('data-task-id', t.id);
-
             let longPressTimer;
-            item.addEventListener('touchstart', (e) => {
-                longPressTimer = setTimeout(() => openContextMenu(e, t.id), 500);
-            });
+            item.addEventListener('touchstart', (e) => { longPressTimer = setTimeout(() => openContextMenu(e, t.id), 500); });
             item.addEventListener('touchend', () => clearTimeout(longPressTimer));
             item.addEventListener('touchmove', () => clearTimeout(longPressTimer));
             item.addEventListener('contextmenu', (e) => { e.preventDefault(); openContextMenu(e, t.id); });
-
             item.innerHTML = `
                 <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="toggleTask('${t.id}')" class="custom-checkbox mt-0.5">
                 <div class="flex-1 min-w-0">
@@ -454,39 +419,25 @@
             e.preventDefault();
             const menu = document.getElementById('context-menu');
             const overlay = document.getElementById('context-overlay');
-            const t = tasks.find(x => x.id == taskId);
-            if (!t) return;
-
             let x = e.clientX || (e.touches && e.touches[0].clientX) || 100;
             let y = e.clientY || (e.touches && e.touches[0].clientY) || 100;
-
             menu.innerHTML = `
-                <button onclick="openEditModal('${taskId}'); closeContextMenu();">
-                    <i data-lucide="pencil" class="w-4 h-4"></i> 編集
-                </button>
-                <button class="danger" onclick="startDelete('${taskId}'); closeContextMenu();">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i> 削除
-                </button>
+                <button onclick="openEditModal('${taskId}'); closeContextMenu();"><i data-lucide="pencil" class="w-4 h-4"></i> 編集</button>
+                <button class="danger" onclick="startDelete('${taskId}'); closeContextMenu();"><i data-lucide="trash-2" class="w-4 h-4"></i> 削除</button>
             `;
-
             menu.style.left = Math.min(x, window.innerWidth - 180) + 'px';
             menu.style.top = Math.min(y, window.innerHeight - 120) + 'px';
             menu.classList.remove('hidden');
             overlay.classList.remove('hidden');
             lucide.createIcons();
         }
-
-        function closeContextMenu() {
-            document.getElementById('context-menu').classList.add('hidden');
-            document.getElementById('context-overlay').classList.add('hidden');
-        }
+        function closeContextMenu() { document.getElementById('context-menu').classList.add('hidden'); document.getElementById('context-overlay').classList.add('hidden'); }
 
         // --- Summary ---
         function renderSummary() {
             renderSummaryTo('summary-container');
             renderSummaryTo('board-summary-container');
         }
-
         function renderSummaryTo(containerId) {
             const container = document.getElementById(containerId);
             if (!container) return;
@@ -495,10 +446,7 @@
             const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
             const tomorrowStr = tomorrow.toISOString().split('T')[0];
             const recent = getActiveTasks().filter(t => t.date && (t.date === todayStr || t.date === tomorrowStr)).sort((a, b) => a.completed - b.completed);
-            if (recent.length === 0) {
-                container.innerHTML = '<p class="text-slate-300 text-sm py-2">直近の予定はありません</p>';
-                return;
-            }
+            if (recent.length === 0) { container.innerHTML = '<p class="text-slate-300 text-sm py-2">直近の予定はありません</p>'; return; }
             recent.forEach(t => container.appendChild(createTaskCard(t, false)));
         }
 
@@ -507,30 +455,34 @@
             const container = document.getElementById('project-container');
             container.innerHTML = '';
             const clients = [...new Set(tasks.map(t => t.clientName))];
-            if (clients.length === 0) {
-                container.innerHTML = '<p class="text-slate-300 text-sm py-2">右下の＋ボタンからタスクを追加してください</p>';
-                return;
-            }
+            if (clients.length === 0) { container.innerHTML = '<p class="text-slate-300 text-sm py-2">右下の＋ボタンからタスクを追加してください</p>'; return; }
             clients.forEach(clientName => {
                 const clientTasks = getActiveTasks().filter(t => t.clientName === clientName);
                 const section = document.createElement('div');
-                section.className = 'bg-white rounded-xl border border-slate-200 overflow-hidden';
+                section.className = 'bg-white rounded-xl border border-slate-200 overflow-hidden accordion-section';
                 const header = document.createElement('div');
-                header.className = 'flex items-center gap-3 p-4 cursor-pointer hover:bg-slate-50';
+                header.className = 'flex items-center gap-3 p-4 cursor-pointer hover:bg-slate-50 accordion-header';
                 header.innerHTML = `
                     <div class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400"><i data-lucide="user-round" class="w-3.5 h-3.5"></i></div>
                     <span class="font-bold text-sm flex-1">${clientName}</span>
                     <span class="text-[10px] text-slate-300 font-medium">${clientTasks.length}件</span>
-                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-300 accordion-icon"></i>
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-300 accordion-icon" style="transition:transform 0.2s;"></i>
                 `;
                 const body = document.createElement('div');
-                body.className = 'border-t border-slate-100 p-3 space-y-2 hidden';
+                body.className = 'border-t border-slate-100 p-3 space-y-2 accordion-body';
+                if (!allAccordionsOpen) body.classList.add('hidden');
 
                 header.onclick = () => {
                     body.classList.toggle('hidden');
                     const icon = header.querySelector('.accordion-icon');
                     icon.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
                 };
+
+                if (!allAccordionsOpen) {
+                    // icon default
+                } else {
+                    header.querySelector('.accordion-icon') || null;
+                }
 
                 if (clientTasks.length === 0) {
                     body.innerHTML = '<p class="text-slate-300 text-xs py-2 px-2">タスクなし</p>';
@@ -539,21 +491,36 @@
                     parentTasks.forEach(pt => {
                         body.appendChild(createTaskCard(pt, true));
                         const subTasks = clientTasks.filter(t => t.parentId === pt.id);
-                        subTasks.forEach(st => {
-                            const sub = createTaskCard(st, true);
-                            sub.classList.add('ml-6');
-                            body.appendChild(sub);
-                        });
+                        subTasks.forEach(st => { const sub = createTaskCard(st, true); sub.classList.add('ml-6'); body.appendChild(sub); });
                     });
-                    // Orphan subtasks
                     const orphans = clientTasks.filter(t => t.parentId && !clientTasks.find(p => p.id === t.parentId));
                     orphans.forEach(ot => body.appendChild(createTaskCard(ot, true)));
                 }
-
                 section.appendChild(header);
                 section.appendChild(body);
                 container.appendChild(section);
             });
+
+            // Fix icon rotation for open accordions
+            if (allAccordionsOpen) {
+                document.querySelectorAll('.accordion-icon').forEach(icon => { icon.style.transform = 'rotate(180deg)'; });
+            }
+
+            updateToggleAllButton();
+        }
+
+        function toggleAllAccordions() {
+            allAccordionsOpen = !allAccordionsOpen;
+            const bodies = document.querySelectorAll('.accordion-body');
+            const icons = document.querySelectorAll('.accordion-icon');
+            bodies.forEach(b => { if (allAccordionsOpen) b.classList.remove('hidden'); else b.classList.add('hidden'); });
+            icons.forEach(i => { i.style.transform = allAccordionsOpen ? 'rotate(180deg)' : ''; });
+            updateToggleAllButton();
+        }
+
+        function updateToggleAllButton() {
+            const btn = document.getElementById('toggle-all-accordion');
+            if (btn) btn.textContent = allAccordionsOpen ? 'すべて閉じる' : 'すべて開く';
         }
 
         // --- Board view ---
@@ -568,7 +535,6 @@
                 card.innerHTML = `<div class="board-card-header">${clientName}<span class="text-xs text-slate-400 ml-2">${clientTasks.length}件</span></div>`;
                 const body = document.createElement('div');
                 body.className = 'board-card-body space-y-2';
-
                 if (clientTasks.length === 0) {
                     body.innerHTML = '<p class="text-slate-300 text-xs py-4 text-center">タスクなし</p>';
                 } else {
@@ -576,16 +542,11 @@
                     parentTasks.forEach(pt => {
                         body.appendChild(createTaskCard(pt, true));
                         const subTasks = clientTasks.filter(t => t.parentId === pt.id);
-                        subTasks.forEach(st => {
-                            const sub = createTaskCard(st, true);
-                            sub.classList.add('ml-4');
-                            body.appendChild(sub);
-                        });
+                        subTasks.forEach(st => { const sub = createTaskCard(st, true); sub.classList.add('ml-4'); body.appendChild(sub); });
                     });
                     const orphans = clientTasks.filter(t => t.parentId && !clientTasks.find(p => p.id === t.parentId));
                     orphans.forEach(ot => body.appendChild(createTaskCard(ot, true)));
                 }
-
                 card.appendChild(body);
                 container.appendChild(card);
             });
@@ -596,60 +557,39 @@
             calendarMonth += delta;
             if (calendarMonth > 11) { calendarMonth = 0; calendarYear++; }
             if (calendarMonth < 0) { calendarMonth = 11; calendarYear--; }
-            renderCalendar();
-            renderCalendarDetail();
-            lucide.createIcons();
+            renderCalendar(); renderCalendarDetail(); lucide.createIcons();
         }
 
         function renderCalendar() {
             const grid = document.getElementById('calendar-grid');
             grid.innerHTML = '';
             document.getElementById('calendar-month-label').textContent = `${calendarYear}年 ${calendarMonth + 1}月`;
-
             ['月','火','水','木','金','土','日'].forEach((d, i) => {
                 const h = document.createElement('div');
                 h.className = `text-[10px] font-bold text-center pb-2 ${i === 5 ? 'text-blue-400' : i === 6 ? 'text-red-400' : 'text-slate-300'}`;
-                h.textContent = d;
-                grid.appendChild(h);
+                h.textContent = d; grid.appendChild(h);
             });
-
             const startDay = (new Date(calendarYear, calendarMonth, 1).getDay() + 6) % 7;
             for (let s = 0; s < startDay; s++) grid.appendChild(document.createElement('div'));
-
             const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
             const todayStr = new Date().toISOString().split('T')[0];
-
             for (let d = 1; d <= daysInMonth; d++) {
                 const dateStr = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 const dayTasks = getActiveTasks().filter(t => t.date === dateStr && !t.completed);
                 const dayOfWeek = new Date(calendarYear, calendarMonth, d).getDay();
                 const isHoliday = holidays2026[dateStr];
-                const isSunday = dayOfWeek === 0;
-                const isSaturday = dayOfWeek === 6;
-
-                const cell = document.createElement('div');
                 let classes = 'calendar-day';
                 if (selectedDate === dateStr) classes += ' selected';
                 if (dateStr === todayStr) classes += ' today';
                 if (isHoliday) classes += ' holiday';
-                if (isSunday) classes += ' sunday';
-                if (isSaturday) classes += ' saturday';
+                if (dayOfWeek === 0) classes += ' sunday';
+                if (dayOfWeek === 6) classes += ' saturday';
+                const cell = document.createElement('div');
                 cell.className = classes;
                 cell.onclick = () => { selectedDate = dateStr; renderCalendar(); renderCalendarDetail(); lucide.createIcons(); };
-
                 cell.innerHTML = `<span class="text-[11px] font-bold day-number">${d}</span>`;
-                if (isHoliday) {
-                    const hl = document.createElement('span');
-                    hl.className = 'text-[7px] text-red-400 leading-none mt-0.5';
-                    hl.textContent = isHoliday;
-                    cell.appendChild(hl);
-                }
-                dayTasks.slice(0, 3).forEach(t => {
-                    const dot = document.createElement('div');
-                    dot.className = 'calendar-task-dot bg-slate-900';
-                    cell.appendChild(dot);
-                });
-
+                if (isHoliday) { const hl = document.createElement('span'); hl.className = 'text-[7px] text-red-400 leading-none mt-0.5'; hl.textContent = isHoliday; cell.appendChild(hl); }
+                dayTasks.slice(0, 3).forEach(() => { const dot = document.createElement('div'); dot.className = 'calendar-task-dot bg-slate-900'; cell.appendChild(dot); });
                 grid.appendChild(cell);
             }
         }
@@ -666,10 +606,7 @@
             if (dayTasks.length > 0) {
                 badge.textContent = `${dayTasks.length}件`; badge.classList.remove('hidden');
                 dayTasks.forEach(t => list.appendChild(createTaskCard(t, false)));
-            } else {
-                badge.classList.add('hidden');
-                list.innerHTML = '<p class="text-slate-300 text-xs text-center py-6">この日の予定はありません</p>';
-            }
+            } else { badge.classList.add('hidden'); list.innerHTML = '<p class="text-slate-300 text-xs text-center py-6">この日の予定はありません</p>'; }
         }
 
         // --- Actions ---
@@ -679,41 +616,26 @@
                 t.completed = !t.completed;
                 localStorage.setItem('tasks-cache', JSON.stringify(tasks));
                 renderAll();
-                await apiCall({
-                    action: 'save', id: t.id, clientName: t.clientName, title: t.title || '',
-                    date: t.date || '', parentId: t.parentId || '', status: t.status,
-                    completed: t.completed.toString()
-                });
+                await apiCall({ action: 'save', id: t.id, clientName: t.clientName, title: t.title || '', date: t.date || '', parentId: t.parentId || '', status: t.status, completed: t.completed.toString() });
             }
         }
 
         async function cycleStatus(id) {
             const t = tasks.find(x => x.id == id);
             if (t && !t.completed) {
-                const next = statusMap[t.status || 'todo'].next;
-                t.status = next;
+                t.status = statusMap[t.status || 'todo'].next;
                 localStorage.setItem('tasks-cache', JSON.stringify(tasks));
                 renderAll();
-                await apiCall({
-                    action: 'save', id: t.id, clientName: t.clientName, title: t.title || '',
-                    date: t.date || '', parentId: t.parentId || '', status: t.status,
-                    completed: t.completed.toString()
-                });
+                await apiCall({ action: 'save', id: t.id, clientName: t.clientName, title: t.title || '', date: t.date || '', parentId: t.parentId || '', status: t.status, completed: t.completed.toString() });
             }
         }
 
         function startDelete(id) {
-            const t = tasks.find(x => x.id == id);
-            if (!t) return;
             const children = tasks.filter(c => c.parentId == id);
             if (children.length > 0) {
                 pendingDeleteId = id;
                 document.getElementById('child-modal').classList.replace('hidden', 'flex');
-            } else {
-                if (confirm('この作業を削除しますか？')) {
-                    deleteApiCall(id);
-                }
-            }
+            } else { if (confirm('この作業を削除しますか？')) deleteApiCall(id); }
         }
 
         async function confirmDeleteWithChildren() {
@@ -732,9 +654,7 @@
             pendingDeleteId = null;
         }
 
-        function closeChildModal() {
-            document.getElementById('child-modal').classList.replace('flex', 'hidden');
-        }
+        function closeChildModal() { document.getElementById('child-modal').classList.replace('flex', 'hidden'); }
 
         // --- Modal ---
         function setModalTab(tab) {
@@ -753,8 +673,7 @@
             document.getElementById('modal-tabs').classList.remove('hidden');
             setModalTab('task');
             document.getElementById('task-modal').classList.replace('hidden', 'flex');
-            updateFormHelpers();
-            lucide.createIcons();
+            updateFormHelpers(); lucide.createIcons();
         }
 
         function openEditModal(id) {
@@ -771,29 +690,23 @@
             document.getElementById('modal-tabs').classList.add('hidden');
             setModalTab('task');
             document.getElementById('task-modal').classList.replace('hidden', 'flex');
-            updateFormHelpers();
-            lucide.createIcons();
+            updateFormHelpers(); lucide.createIcons();
         }
 
         async function deleteTask() {
             const id = document.getElementById('edit-task-id').value;
             if (!id) return;
-            closeModal();
-            startDelete(id);
+            closeModal(); startDelete(id);
         }
 
         function handleSubmit(e) {
             e.preventDefault();
             const id = document.getElementById('edit-task-id').value || Date.now().toString();
             const existing = tasks.find(t => t.id == id);
-
             if (modalTab === 'client') {
                 const clientName = document.getElementById('client-name').value;
                 if (!clientName) return false;
-                apiCall({
-                    action: 'save', id: id, clientName: clientName, title: '',
-                    date: '', parentId: '', status: 'todo', completed: 'false'
-                });
+                apiCall({ action: 'save', id: id, clientName: clientName, title: '', date: '', parentId: '', status: 'todo', completed: 'false' });
             } else {
                 apiCall({
                     action: 'save', id: id,
@@ -805,13 +718,10 @@
                     completed: existing ? existing.completed.toString() : 'false'
                 });
             }
-            closeModal();
-            return false;
+            closeModal(); return false;
         }
 
-        function closeModal() {
-            document.getElementById('task-modal').classList.replace('flex', 'hidden');
-        }
+        function closeModal() { document.getElementById('task-modal').classList.replace('flex', 'hidden'); }
 
         function updateFormHelpers() {
             const clientList = document.getElementById('client-list');
@@ -827,15 +737,13 @@
             parentSelect.value = currentVal;
         }
 
-        // --- View switching ---
+        // --- View ---
         function switchView(view) {
             currentView = view;
             document.getElementById('list-view').classList.toggle('hidden', view !== 'list');
             document.getElementById('board-view').classList.toggle('hidden', view !== 'board');
             document.getElementById('calendar-view').classList.toggle('hidden', view !== 'calendar');
-            ['list', 'board', 'calendar'].forEach(v => {
-                document.getElementById('btn-' + v).className = v === view ? 'active' : '';
-            });
+            ['list', 'board', 'calendar'].forEach(v => { document.getElementById('btn-' + v).className = v === view ? 'active' : ''; });
             renderAll();
         }
 
