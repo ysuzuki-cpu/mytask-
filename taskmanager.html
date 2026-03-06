@@ -15,6 +15,7 @@
     body{font-family:'Inter','Noto Sans JP',sans-serif;background:var(--bg-main);margin:0;overscroll-behavior-y:contain}
     .task-panel{background:#fff;border:1px solid #e2e8f0;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:transform .1s;border-radius:1rem;padding:.75rem 1rem}
     .task-panel:active{transform:scale(.98)}
+    .task-panel.overdue{border-left:3px solid #ef4444}
     .status-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:9999px;cursor:pointer;user-select:none;white-space:nowrap}
     .status-todo{background:#fef2f2;color:#ef4444;border:1px solid #fee2e2}
     .status-doing{background:#eff6ff;color:#3b82f6;border:1px solid #dbeafe}
@@ -25,7 +26,10 @@
     .custom-checkbox:checked::after{content:"✓";position:absolute;color:#fff;font-size:.75rem;left:50%;top:50%;transform:translate(-50%,-50%)}
     .task-completed{opacity:.5}
     .task-completed .task-title-text{text-decoration:line-through}
+    .task-completed.overdue{border-left-color:#e2e8f0}
     .date-badge{font-size:10px;font-weight:500;color:#64748b;background:#f1f5f9;padding:1px 6px;border-radius:4px}
+    .date-badge.overdue-date{color:#ef4444;background:#fef2f2;font-weight:700}
+    .overdue-tag{font-size:9px;font-weight:700;color:#ef4444;background:#fef2f2;border:1px solid #fee2e2;padding:1px 6px;border-radius:9999px}
     .loading-overlay{position:fixed;inset:0;background:#fff;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center}
     .toast{position:fixed;top:1rem;left:50%;transform:translateX(-50%);z-index:300;padding:.5rem 1.5rem;border-radius:1rem;font-size:.8rem;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none}
     .toast.show{opacity:1}
@@ -227,6 +231,7 @@ function todayStr(){return new Date().toISOString().split('T')[0]}
 function tomorrowStr(){var d=new Date();d.setDate(d.getDate()+1);return d.toISOString().split('T')[0]}
 function hashStr(s){var h=0;for(var i=0;i<s.length;i++)h=s.charCodeAt(i)+((h<<5)-h);return Math.abs(h)}
 function getClientColor(name){if(clientColorMap[name])return clientColorMap[name];return defaultColors[hashStr(name)%defaultColors.length]}
+function isOverdue(t){if(!t.date||t.completed)return false;return t.date<todayStr()}
 
 function showToast(msg,type){var t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+(type==='error'?'toast-error':'toast-success');setTimeout(function(){t.className='toast'},2000)}
 function showError(msg){document.getElementById('error-msg').textContent=msg;document.getElementById('error-bar').classList.remove('hidden')}
@@ -299,10 +304,20 @@ function renderAll(){
 function createTaskCard(t){
   var s=statusMap[t.status]||statusMap.todo;
   var isCompleted=t.completed;
+  var overdue=isOverdue(t);
   var div=document.createElement('div');
-  div.className='task-panel'+(isCompleted?' task-completed':'');
+  div.className='task-panel'+(isCompleted?' task-completed':'')+(overdue?' overdue':'');
   var titleText=t.title||'（タスクなし）';
   var uid='t'+hashStr(t.id+''+Math.random());
+
+  var dateHtml='';
+  if(t.date){
+    if(overdue){
+      dateHtml='<span class="date-badge overdue-date">'+t.date+'</span><span class="overdue-tag">期限切れ</span>';
+    }else{
+      dateHtml='<span class="date-badge">'+t.date+'</span>';
+    }
+  }
 
   div.innerHTML='<div class="flex items-start gap-3">'
     +'<input type="checkbox" class="custom-checkbox mt-0.5" id="'+uid+'" '+(isCompleted?'checked':'')+'>'
@@ -312,7 +327,7 @@ function createTaskCard(t){
     +'</div>'
     +'<div class="flex items-center gap-2 flex-wrap">'
     +'<span class="status-tag '+s.cls+'" data-role="status">'+s.label+'</span>'
-    +(t.date?'<span class="date-badge">'+t.date+'</span>':'')
+    +dateHtml
     +'</div>'
     +'</div>'
     +'<button class="edit-btn text-slate-300 hover:text-slate-500 shrink-0 mt-0.5"><i data-lucide="pencil" class="w-4 h-4"></i></button>'
@@ -349,11 +364,13 @@ function renderProjectList(){
     var color=getClientColor(name);
     var clientTasks=tasks.filter(function(t){return t.clientName===name});
     var parentTasks=clientTasks.filter(function(t){return !t.parentId});
+    var overdueCount=clientTasks.filter(function(t){return isOverdue(t)}).length;
     var wrapper=document.createElement('div');
     var header=document.createElement('div');
     header.className='accordion-header';
     header.style.backgroundColor=color.bg;header.style.color=color.text;
-    header.innerHTML='<div class="flex items-center gap-2"><span class="font-bold text-sm">'+name+'</span><span class="text-xs opacity-60">'+clientTasks.length+'件</span></div><i data-lucide="chevron-down" class="w-4 h-4 transition-transform"></i>';
+    var overdueHtml=overdueCount>0?'<span class="text-[10px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">'+overdueCount+'件期限切れ</span>':'';
+    header.innerHTML='<div class="flex items-center gap-2"><span class="font-bold text-sm">'+name+'</span><span class="text-xs opacity-60">'+clientTasks.length+'件</span>'+overdueHtml+'</div><i data-lucide="chevron-down" class="w-4 h-4 transition-transform"></i>';
     var body=document.createElement('div');
     body.className='accordion-body'+(allAccordionsOpen?' open':'');
     if(allAccordionsOpen)body.style.paddingTop='0.5rem';
