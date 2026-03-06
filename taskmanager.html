@@ -357,13 +357,42 @@ function renderSummary(containerId){
   });
 }
 
+function renderTaskTree(body,clientTasks){
+  var rendered={};
+  var parentTasks=clientTasks.filter(function(t){return !t.parentId});
+  parentTasks.forEach(function(t){
+    rendered[t.id]=true;
+    if(t.title)body.appendChild(createTaskCard(t));
+    var children=clientTasks.filter(function(ct){return ct.parentId===t.id});
+    children.forEach(function(ct){
+      rendered[ct.id]=true;
+      var card=createTaskCard(ct);
+      card.style.marginLeft='1.5rem';
+      card.style.marginTop='0.25rem';
+      body.appendChild(card);
+    });
+  });
+  clientTasks.forEach(function(t){
+    if(!rendered[t.id]){
+      if(t.parentId){
+        var parentExists=clientTasks.find(function(p){return p.id===t.parentId});
+        if(!parentExists){
+          var card=createTaskCard(t);
+          card.style.marginLeft='1.5rem';
+          card.style.marginTop='0.25rem';
+          body.appendChild(card);
+        }
+      }
+    }
+  });
+}
+
 function renderProjectList(){
   var c=document.getElementById('project-container');c.innerHTML='';
   var clients=getOrderedClients();
   clients.forEach(function(name){
     var color=getClientColor(name);
     var clientTasks=tasks.filter(function(t){return t.clientName===name});
-    var parentTasks=clientTasks.filter(function(t){return !t.parentId});
     var overdueCount=clientTasks.filter(function(t){return isOverdue(t)}).length;
     var wrapper=document.createElement('div');
     var header=document.createElement('div');
@@ -382,16 +411,10 @@ function renderProjectList(){
     });
     if(allAccordionsOpen){var icon=header.querySelector('i');if(icon)icon.style.transform='rotate(180deg)'}
 
-    if(parentTasks.length===0&&clientTasks.length===0){
+    if(clientTasks.length===0){
       var p=document.createElement('p');p.className='text-sm text-slate-400 py-3 px-1';p.textContent='タスクなし';body.appendChild(p);
     } else {
-      parentTasks.forEach(function(t){
-        if(t.title)body.appendChild(createTaskCard(t));
-        var children=clientTasks.filter(function(ct){return ct.parentId===t.id});
-        children.forEach(function(ct){var card=createTaskCard(ct);card.style.marginLeft='1.5rem';card.style.marginTop='0.25rem';body.appendChild(card)});
-      });
-      var orphans=clientTasks.filter(function(t){return t.parentId&&!clientTasks.find(function(p){return p.id===t.parentId})});
-      orphans.forEach(function(t){body.appendChild(createTaskCard(t))});
+      renderTaskTree(body,clientTasks);
     }
     wrapper.appendChild(header);wrapper.appendChild(body);c.appendChild(wrapper);
   });
@@ -442,7 +465,7 @@ function renderBoard(){
     header.appendChild(headerLeft);header.appendChild(headerRight);
     var body=document.createElement('div');body.className='board-card-body';
     if(clientTasks.length===0){body.innerHTML='<p class="text-sm text-slate-400 py-3">タスクなし</p>'}
-    else{clientTasks.forEach(function(t){if(t.title)body.appendChild(createTaskCard(t))})}
+    else{renderTaskTree(body,clientTasks)}
     card.appendChild(header);card.appendChild(body);c.appendChild(card);
   });
 }
